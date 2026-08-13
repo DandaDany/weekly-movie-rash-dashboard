@@ -174,6 +174,15 @@ class CinemaOnlineCollector(Collector):
                 prev_rank, prev_label = _previous_rank(cells[-2].get_text(" ", strip=True))
                 release_date = _parse_date(cells[-1].get_text(" ", strip=True))
 
+                if prev_rank is None and not prev_label:
+                    raise ValueError(
+                        f"Could not parse Previous Week for {market} rank {rank}; refusing to save"
+                    )
+                if release_date is None:
+                    raise ValueError(
+                        f"Could not parse Release Date for {market} rank {rank}; refusing to save"
+                    )
+
                 records.append(
                     BoxOfficeRecord(
                         market=market,
