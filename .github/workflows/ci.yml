@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-live-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install -e ".[test]"
+
+      - name: Run regression tests
+        run: pytest -q
+
+      - name: Live-check Cinema Online parser
+        run: python scripts/run_cinema_online.py
