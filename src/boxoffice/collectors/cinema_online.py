@@ -109,6 +109,11 @@ class CinemaOnlineCollector(Collector):
     than brittle CSS class names. The live site currently places each heading
     inside its chart table, while older/simplified markup may place it just before
     the table, so both layouts are supported.
+
+    Cinema Online's desktop rows can contain both a poster cell and a separate
+    title cell before Previous Week / Release Date. Older/simplified markup can
+    combine poster + title into one cell. The final two cells are therefore used
+    for Previous Week and Release Date so both shapes remain compatible.
     """
 
     name = "cinema_online"
@@ -157,7 +162,7 @@ class CinemaOnlineCollector(Collector):
 
             for tr in table.find_all("tr"):
                 cells = tr.find_all(["td", "th"])
-                if len(cells) < 3:
+                if len(cells) < 4:
                     continue
 
                 rank_text = " ".join(cells[0].stripped_strings).strip()
@@ -166,10 +171,8 @@ class CinemaOnlineCollector(Collector):
 
                 rank = int(rank_text)
                 title = _clean_title(cells[1], market)
-                prev_rank, prev_label = _previous_rank(cells[2].get_text(" ", strip=True))
-                release_date = None
-                if len(cells) >= 4:
-                    release_date = _parse_date(cells[3].get_text(" ", strip=True))
+                prev_rank, prev_label = _previous_rank(cells[-2].get_text(" ", strip=True))
+                release_date = _parse_date(cells[-1].get_text(" ", strip=True))
 
                 records.append(
                     BoxOfficeRecord(
