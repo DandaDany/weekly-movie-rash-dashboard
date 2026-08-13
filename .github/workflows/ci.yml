@@ -30,51 +30,30 @@ jobs:
         run: python scripts/run_cinema_online.py
 
       # Temporary P1 discovery step. Remove after the Cinepoint collector lands.
-      - name: Probe Cinepoint homepage weekly ranking SSR
+      - name: Probe Cinepoint weekly ranking endpoint
         run: |
           python - <<'PY'
+          import json
           import requests
-          from bs4 import BeautifulSoup
 
-          headers = {"User-Agent": "Mozilla/5.0"}
-          urls = [
-              "https://cinepoint.com/?freq=weekly",
-              "https://cinepoint.com/?freq=weekly&type=all",
-              "https://cinepoint.com/home?freq=weekly",
-              "https://cinepoint.com/home?freq=weekly&type=all",
+          headers = {
+              "User-Agent": "Mozilla/5.0",
+              "Accept": "application/json, text/plain, */*",
+              "Content-Type": "application/json",
+              "Referer": "https://cinepoint.com/",
+          }
+          base = "https://cinepoint.com/bff/v1/home/box-office/weekly"
+          variants = [
+              {"type": "all", "limit": 10, "page": 0, "spinneroff": 1},
+              {"type": "all", "limit": 10, "page": 1, "spinneroff": 1},
+              {"type": "all", "rows": 10, "first": 0, "spinneroff": 1},
+              {"type": "all", "spinneroff": 1},
           ]
-
-          for url in urls:
-              r = requests.get(url, headers=headers, timeout=(10, 45))
-              print("URL", r.url, "STATUS", r.status_code, "LEN", len(r.text))
-              r.raise_for_status()
-              soup = BeautifulSoup(r.text, "html.parser")
-              text = " ".join(soup.stripped_strings)
-              print("HAS_RANK", "Rank" in text, "HAS_WEEKLY_ADM", "Weekly Adm" in text)
-
-              tables = soup.find_all("table")
-              print("TABLE_COUNT", len(tables))
-              for idx, table in enumerate(tables):
-                  headers_text = [
-                      " ".join(cell.stripped_strings)
-                      for cell in table.find_all("th")
-                  ]
-                  rows = []
-                  for tr in table.find_all("tr"):
-                      cells = tr.find_all(["td", "th"])
-                      values = [" ".join(cell.stripped_strings) for cell in cells]
-                      if values:
-                          rows.append(values)
-                  print("TABLE", idx, "HEADERS", headers_text)
-                  print("ROWS", rows[:12])
-                  if rows:
-                      first_data = table.find_all("tr")[1] if len(table.find_all("tr")) > 1 else None
-                      if first_data:
-                          print("FIRST_ROW_HTML", str(first_data)[:8000])
-
-              marker = text.find("Top Box Office")
-              if marker >= 0:
-                  print("TBO_TEXT", text[marker:marker + 6500])
+          for params in variants:
+              r = requests.get(base, params=params, headers=headers, timeout=(10, 45))
+              print("URL", r.url)
+              print("STATUS", r.status_code, "CONTENT_TYPE", r.headers.get("content-type"))
+              print("BODY", r.text[:12000])
               print("---")
           PY
 
