@@ -90,10 +90,22 @@ class CinepointCollector(Collector):
                 page.goto(BASE_URL, wait_until="domcontentloaded", timeout=90_000)
                 weekly_tab = page.get_by_text("Weekly", exact=True).first
                 weekly_tab.wait_for(state="visible", timeout=60_000)
+
+                # Cinepoint is SSR first, then Angular hydrates. Give the public
+                # tab its event handler before clicking.
                 page.wait_for_timeout(5_000)
                 weekly_tab.click(timeout=30_000)
                 page.locator("th", has_text="Weekly Adm.").wait_for(
                     state="visible", timeout=60_000
+                )
+
+                # The header switches before the async weekly rows arrive. Do not
+                # snapshot the intermediate empty tbody: wait until a minimally
+                # valid chart is actually rendered, then let parser/validation
+                # enforce the final row/rank contract.
+                page.wait_for_function(
+                    "document.querySelectorAll('tbody.p-datatable-tbody tr').length >= 5",
+                    timeout=60_000,
                 )
                 return FetchResult(source_url=page.url, body=page.content())
             except PlaywrightTimeoutError as exc:
