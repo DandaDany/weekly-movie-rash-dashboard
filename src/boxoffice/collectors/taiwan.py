@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
@@ -193,6 +194,24 @@ class TaiwanCollector(Collector):
                 browser.close()
 
     def parse(self, result: FetchResult) -> list[BoxOfficeRecord]:
+        # Keep the old semantic guard even though production now targets the
+        # homepage. A cumulative open-data payload must never be accepted as a
+        # weekly chart if it is accidentally routed into this parser.
+        if "json" in result.content_type.lower() or result.body.lstrip().startswith("{"):
+            payload = json.loads(result.body)
+            distributions = (payload.get("result") or {}).get("distribution") or []
+            for resource in distributions:
+                resource_url = str(resource.get("resourceDownloadUrl") or "")
+                request_params = resource.get("resourceRequestParameters") or []
+                if "since2016" in resource_url.lower() and not request_params:
+                    raise SourceUnavailableError(
+                        "Official Taiwan open data exposes cumulative `since2016` data; "
+                        "it is not a single-week ranking and will not be substituted.",
+                        reason="weekly_resource_unavailable",
+                        source_url=result.source_url,
+                    )
+            raise ValueError("Taiwan parser expected homepage weekly HTML, not JSON metadata")
+
         soup = BeautifulSoup(result.body, "html.parser")
         cards = soup.select('a[role="gridcell"]')
         if len(cards) < 5:
