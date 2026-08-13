@@ -29,29 +29,45 @@ jobs:
       - name: Live-check Cinema Online parser
         run: python scripts/run_cinema_online.py
 
-      # Temporary P1 discovery step. Remove after the Cinepoint collector lands.
-      - name: Verify Cinepoint browser-equivalent weekly query
+      # Temporary P1 discovery step. Remove after the Cinepoint collector lands
+      # or is intentionally downgraded to a browser/DOM collector.
+      - name: Inspect Cinepoint request interceptor
         run: |
           python - <<'PY'
+          import re
           import requests
 
-          url = "https://cinepoint.com/bff/v1/home/box-office/weekly"
-          headers = {
-              "User-Agent": "Mozilla/5.0",
-              "Accept": "application/json",
-              "Referer": "https://cinepoint.com/",
-          }
-          params = {
-              "limit": 10,
-              "page": 0,
-              "type": "all",
-              "spinneroff": "1",
-          }
-          r = requests.get(url, params=params, headers=headers, timeout=(10, 30))
-          print("REQUEST", r.url)
-          print("STATUS", r.status_code, "TYPE", r.headers.get("content-type"), "LEN", len(r.content))
-          print(r.text[:12000])
+          headers = {"User-Agent": "Mozilla/5.0"}
+          url = "https://cinepoint.com/chunk-TC6ZXBJ4.js"
+          r = requests.get(url, headers=headers, timeout=(10, 45))
           r.raise_for_status()
+          text = r.text
+
+          needles = (
+              "intercept(",
+              "Authorization",
+              "authorization",
+              "api-key",
+              "apiKey",
+              "x-api",
+              "X-API",
+              "x-",
+              "SHA256",
+              "Dr(",
+              "HttpInterceptor",
+              "spinneroff",
+              "response_output",
+          )
+          for needle in needles:
+              print("###", needle, "COUNT", text.count(needle))
+              start = 0
+              for _ in range(min(20, text.count(needle))):
+                  i = text.find(needle, start)
+                  if i < 0:
+                      break
+                  print(text[max(0, i - 2400): i + 4200])
+                  print("---")
+                  start = i + len(needle)
           PY
 
       - name: Upload failed raw source for parser repair
