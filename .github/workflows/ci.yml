@@ -30,46 +30,27 @@ jobs:
         run: python scripts/run_cinema_online.py
 
       # Temporary P1 discovery step. Remove after the Cinepoint collector lands.
-      - name: Locate Cinepoint MovieService endpoint builder
+      - name: Resolve Cinepoint TopBoxOffice endpoint constants
         run: |
           python - <<'PY'
-          import re
-          from concurrent.futures import ThreadPoolExecutor, as_completed
-          from urllib.parse import urljoin
           import requests
 
           headers = {"User-Agent": "Mozilla/5.0"}
-          root_url = "https://cinepoint.com/chunk-Q6ECZFTZ.js"
-          root = requests.get(root_url, timeout=(10, 30), headers=headers)
-          root.raise_for_status()
-          root_text = root.text
-          imports = sorted(set(re.findall(r'from["\'](\./[^"\']+\.js)["\']', root_text)))
-          print("ROOT_IMPORTS", imports)
+          url = "https://cinepoint.com/chunk-TC6ZXBJ4.js"
+          response = requests.get(url, timeout=(10, 45), headers=headers)
+          response.raise_for_status()
+          text = response.text
+          print("CHUNK", response.status_code, len(response.content))
 
-          def fetch(path):
-              url = urljoin(root_url, path)
-              try:
-                  response = requests.get(url, timeout=(5, 15), headers=headers)
-                  return path, response.status_code, response.text if response.status_code == 200 else ""
-              except Exception as exc:
-                  return path, 0, f"ERROR {type(exc).__name__}: {exc}"
-
-          with ThreadPoolExecutor(max_workers=8) as pool:
-              futures = [pool.submit(fetch, path) for path in imports]
-              for future in as_completed(futures):
-                  path, status, text = future.result()
-                  print("FETCH", path, status, len(text))
-                  for needle in ("getTopBoxOfficePage", "getTopBoxOfficeDetail"):
-                      if needle not in text:
-                          continue
-                      print("FOUND", needle, "IN", path)
-                      start = 0
-                      while True:
-                          index = text.find(needle, start)
-                          if index < 0:
-                              break
-                          print(text[max(0, index - 1600): index + 2600])
-                          start = index + len(needle)
+          for needle in ("TOP_BOX_OFFICE_PAGE", "TOP_BOX_OFFICE_DETAIL", "TOP_BOX_OFFICE:"):
+              print("NEEDLE", needle, "COUNT", text.count(needle))
+              start = 0
+              for _ in range(min(10, text.count(needle))):
+                  index = text.find(needle, start)
+                  if index < 0:
+                      break
+                  print(text[max(0, index - 2200): index + 3200])
+                  start = index + len(needle)
           PY
 
       - name: Upload failed raw source for parser repair
