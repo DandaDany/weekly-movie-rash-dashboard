@@ -32,45 +32,76 @@ jobs:
       - name: Live-check Indonesia
         run: python scripts/run_cinepoint.py
 
-      - name: Probe Taiwan TFAI weekly export
+      - name: Diagnose Taiwan TFAI browser access and export
         run: |
           python - <<'PY'
-          import re
-          import requests
-          from bs4 import BeautifulSoup
+          from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
-          headers = {"User-Agent": "Mozilla/5.0"}
-          urls = [
-              "https://boxofficetw.tfai.org.tw/statistic",
-              "https://boxofficetw.tfai.org.tw/statistic/Week/10/0/all/False/ReleaseDate/2026-08-09?End=2026-08-09",
-              "https://boxofficetw.tfai.org.tw/statistic/Week/10/0/all/False/ReleaseDate/2026-08-12?End=2026-08-12",
-          ]
-          for url in urls:
-              r = requests.get(url, headers=headers, timeout=(10, 45), allow_redirects=True)
-              print("URL", r.url, "STATUS", r.status_code, "TYPE", r.headers.get("content-type"), "LEN", len(r.content))
-              print("DISPOSITION", r.headers.get("content-disposition"))
-              print("HEAD", r.text[:1200])
-              if "html" in (r.headers.get("content-type") or ""):
-                  soup = BeautifulSoup(r.text, "html.parser")
-                  print("TITLE", soup.title.get_text(" ", strip=True) if soup.title else None)
-                  for form in soup.find_all("form"):
-                      print("FORM", form.get("method"), form.get("action"), [(x.get("name"), x.get("value")) for x in form.find_all(["input","select"])][:20])
-                  for tag in soup.find_all(["a", "button"]):
-                      text = " ".join(tag.stripped_strings)
-                      attrs = {k:v for k,v in tag.attrs.items() if k in {"href","onclick","id","class","data-type","data-url"}}
-                      if text in {"Excel","PDF","JSON","CSV"} or any(k in str(attrs).lower() for k in ("json","csv","excel","export")):
-                          print("EXPORT_TAG", text, attrs)
-                  scripts = [s.get("src") for s in soup.find_all("script") if s.get("src")]
-                  print("SCRIPTS", scripts[-15:])
-                  for s in soup.find_all("script"):
-                      txt = s.string or s.get_text(" ")
-                      if any(n in txt.lower() for n in ["json", "csv", "export", "excel"]):
-                          print("INLINE_SCRIPT", txt[:10000])
-                  tables = soup.find_all("table")
-                  print("TABLES", len(tables))
-                  for i, table in enumerate(tables[:5]):
-                      print("TABLE", i, "TEXT", " | ".join(table.stripped_strings)[:8000])
-              print("---")
+          interesting = []
+          with sync_playwright() as p:
+              browser = p.chromium.launch(channel="chrome", headless=True)
+              context = browser.new_context(
+                  viewport={"width": 1440, "height": 1600},
+                  locale="zh-TW",
+                  timezone_id="Asia/Taipei",
+              )
+              page = context.new_page()
+
+              def on_request(req):
+                  low = req.url.lower()
+                  if any(k in low for k in ["export", "json", "csv", "excel", "statistic", "download"]):
+                      print("REQUEST", req.method, req.url)
+
+              def on_response(resp):
+                  low = resp.url.lower()
+                  if any(k in low for k in ["export", "json", "csv", "excel", "statistic", "download"]):
+                      print("RESPONSE", resp.status, resp.url, resp.headers.get("content-type"), resp.headers.get("content-disposition"))
+
+              page.on("request", on_request)
+              page.on("response", on_response)
+
+              page.goto("https://boxofficetw.tfai.org.tw/", wait_until="domcontentloaded", timeout=90000)
+              page.wait_for_timeout(5000)
+              print("HOME_URL", page.url)
+              print("HOME_TITLE", page.title())
+              print("HOME_BODY", page.locator("body").inner_text()[:6000])
+              anchors = page.locator("a")
+              for i in range(anchors.count()):
+                  a = anchors.nth(i)
+                  text = a.inner_text().strip()
+                  href = a.get_attribute("href")
+                  if "票房" in text or (href and "statistic" in href.lower()):
+                      print("HOME_LINK", text, href)
+
+              page.goto("https://boxofficetw.tfai.org.tw/statistic", wait_until="domcontentloaded", timeout=90000)
+              page.wait_for_timeout(5000)
+              print("STAT_URL", page.url)
+              print("STAT_TITLE", page.title())
+              body = page.locator("body").inner_text()
+              print("STAT_BODY", body[:12000])
+
+              for label in ["Excel", "PDF", "JSON", "CSV"]:
+                  loc = page.get_by_text(label, exact=True)
+                  print("EXPORT_COUNT", label, loc.count())
+                  for i in range(loc.count()):
+                      el = loc.nth(i)
+                      print("EXPORT_EL", label, i, el.evaluate("el => el.outerHTML")[:3000])
+
+              json_loc = page.get_by_text("JSON", exact=True)
+              if json_loc.count():
+                  target = next((json_loc.nth(i) for i in range(json_loc.count()) if json_loc.nth(i).is_visible()), None)
+                  if target is not None:
+                      try:
+                          with page.expect_download(timeout=10000) as info:
+                              target.click(timeout=10000)
+                          download = info.value
+                          print("DOWNLOAD", download.suggested_filename)
+                      except PlaywrightTimeoutError:
+                          print("DOWNLOAD", "no-download-event")
+                          page.wait_for_timeout(5000)
+                          print("AFTER_JSON_URL", page.url)
+
+              browser.close()
           PY
 
       - name: Upload failed raw source for parser repair
