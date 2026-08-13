@@ -52,8 +52,14 @@ jobs:
               assert "累計人次" in id_headers
 
               page.locator('[data-market="TW"]').click()
-              page.locator("#emptyState").wait_for(state="visible", timeout=5000)
-              assert "自動更新尚未接通" in page.locator("#emptyState").inner_text()
+              tw_rows = page.locator("tbody tr").count()
+              if tw_rows:
+                  assert tw_rows >= 5
+                  assert "台灣票房排行" in page.locator("#marketTitle").inner_text()
+                  assert "本期票房" in page.locator("thead").inner_text()
+              else:
+                  page.locator("#emptyState").wait_for(state="visible", timeout=5000)
+                  assert "自動更新尚未接通" in page.locator("#emptyState").inner_text()
 
               page.locator('[data-market="MY"]').click()
               page.locator("tbody tr").first.wait_for(timeout=5000)
@@ -64,17 +70,28 @@ jobs:
               browser.close()
           PY
 
-      - name: Verify unavailable-source status contract
+      - name: Verify source status contract
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
 
           status = json.loads(Path("public/data/status.json").read_text(encoding="utf-8"))
-          for collector in ("taiwan", "vietnam", "hong_kong"):
+
+          taiwan = status["taiwan"]
+          assert taiwan["availability"] in {"live", "unavailable"}, taiwan
+          if taiwan["availability"] == "live":
+              assert taiwan["success"] is True
+              assert taiwan["records"] >= 5
+          else:
+              assert taiwan["success"] is False
+              assert taiwan["reason"] == "access_blocked", taiwan
+
+          for collector in ("vietnam", "hong_kong"):
               assert collector in status, collector
               assert status[collector]["availability"] == "unavailable", status[collector]
               assert status[collector]["success"] is False
+
           assert status["cinema_online"]["availability"] == "live"
           assert status["cinepoint"]["availability"] == "live"
           PY
