@@ -29,6 +29,41 @@ jobs:
       - name: Live-check Cinema Online parser
         run: python scripts/run_cinema_online.py
 
+      - name: Probe Taiwan weekly source
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          import requests
+
+          response = requests.get(
+              "https://boxofficetw.tfai.org.tw/statistic",
+              timeout=(10, 30),
+              headers={"User-Agent": "Mozilla/5.0"},
+          )
+          response.raise_for_status()
+          Path("taiwan-probe.html").write_text(response.text, encoding="utf-8")
+          print("FINAL_URL", response.url)
+          print("STATUS", response.status_code, "BYTES", len(response.content))
+          print("REFERENCES")
+          for value in re.findall(r'(?:src|href|action)=[\"\']([^\"\']+)', response.text, flags=re.I):
+              lowered = value.lower()
+              if any(key in lowered for key in ("stat", "json", "csv", "open", ".js")):
+                  print(value)
+          print("MATCHING_LINES")
+          for line in response.text.splitlines():
+              lowered = line.lower()
+              if any(key in lowered for key in ("json", "csv", "export", "download", "ajax", "statistic")):
+                  print(line.strip()[:1000])
+          PY
+
+      - name: Upload Taiwan probe
+        uses: actions/upload-artifact@v4
+        with:
+          name: taiwan-probe
+          path: taiwan-probe.html
+          retention-days: 1
+
       - name: Upload failed raw source for parser repair
         if: failure()
         uses: actions/upload-artifact@v4
