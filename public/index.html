@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>亞洲電影票房週榜</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">WEEKLY BOX OFFICE</p>
+        <h1>亞洲電影票房週榜</h1>
+        <p class="subtitle">依各市場公開來源保留原始指標與歷史週期，不強行把不同市場換算成同一種票房口徑。</p>
+      </div>
+      <div id="globalStatus" class="global-status" aria-live="polite">讀取資料中…</div>
+    </header>
+
+    <section class="panel controls-panel" aria-label="榜單篩選">
+      <div id="marketTabs" class="market-tabs" role="tablist" aria-label="市場"></div>
+      <div class="filter-row">
+        <label class="field">
+          <span>週期</span>
+          <select id="periodSelect"></select>
+        </label>
+        <label class="field search-field">
+          <span>搜尋電影</span>
+          <input id="movieSearch" type="search" placeholder="輸入片名" autocomplete="off">
+        </label>
+      </div>
+    </section>
+
+    <section class="source-card" id="sourceCard" aria-live="polite"></section>
+
+    <section class="panel table-panel">
+      <div class="table-heading">
+        <div>
+          <p id="periodLabel" class="period-label"></p>
+          <h2 id="marketTitle">票房排行</h2>
+        </div>
+        <p id="rowCount" class="row-count"></p>
+      </div>
+      <div id="tableWrap" class="table-wrap"></div>
+      <div id="emptyState" class="empty-state" hidden></div>
+    </section>
+  </main>
+  <script src="./app.js" defer></script>
+</body>
+</html>
