@@ -30,40 +30,47 @@ jobs:
         run: python scripts/run_cinema_online.py
 
       # Temporary P1 discovery step. Remove after the Cinepoint collector lands.
-      - name: Inspect Cinepoint request params
+      - name: Resolve Cinepoint country type and weekly response
         run: |
           python - <<'PY'
+          import re
           import requests
 
-          headers = {"User-Agent": "Mozilla/5.0"}
-          url = "https://cinepoint.com/chunk-TC6ZXBJ4.js"
-          response = requests.get(url, headers=headers, timeout=(10, 45))
+          headers = {
+              "User-Agent": "Mozilla/5.0",
+              "Accept": "application/json",
+              "Referer": "https://cinepoint.com/",
+          }
+          bundle_url = "https://cinepoint.com/chunk-TC6ZXBJ4.js"
+          response = requests.get(bundle_url, headers=headers, timeout=(10, 45))
           response.raise_for_status()
           text = response.text
 
-          needles = (
-              "getTopBoxOfficePage(",
-              "getList(e,n={}",
-              "page_size",
-              "pageSize",
-              "page_index",
-              "pageIndex",
-              "per_page",
-              "limit:",
-              "sort_by",
-              "date_start",
-              "date_end",
-          )
-          for needle in needles:
-              print("###", needle, "COUNT", text.count(needle))
-              start = 0
-              for _ in range(min(30, text.count(needle))):
-                  index = text.find(needle, start)
-                  if index < 0:
-                      break
-                  print(text[max(0, index - 1800): index + 3200])
+          for pattern in (
+              r"var vo=.{0,1200}",
+              r"vo=function.{0,1600}",
+              r"function ng\(\).{0,1800}",
+              r"ng=\(\)=>.{0,1800}",
+              r"OF=.{0,1800}",
+              r"function OF\(.{0,1800}",
+          ):
+              matches = re.findall(pattern, text)
+              print("PATTERN", pattern, "MATCHES", len(matches))
+              for match in matches[:10]:
+                  print(match)
                   print("---")
-                  start = index + len(needle)
+
+          # The UI always sends zero-based page/limit. Try a compact set of
+          # plausible public country-type encodings and stop at the first 200.
+          url = "https://cinepoint.com/bff/v1/home/box-office/weekly"
+          type_candidates = ["all", "ALL", "All", "0", "1", "indonesia", "ID", "id"]
+          for type_value in type_candidates:
+              params = {"limit": 10, "page": 0, "type": type_value}
+              r = requests.get(url, params=params, headers=headers, timeout=(10, 30))
+              print("TRY", r.url, "STATUS", r.status_code, "LEN", len(r.content))
+              print(r.text[:5000])
+              if r.status_code == 200:
+                  break
           PY
 
       - name: Upload failed raw source for parser repair
