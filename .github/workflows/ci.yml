@@ -30,31 +30,30 @@ jobs:
         run: python scripts/run_cinema_online.py
 
       # Temporary P1 discovery step. Remove after the Cinepoint collector lands.
-      - name: Probe Cinepoint weekly ranking endpoint
+      - name: Probe Cinepoint Weekly tab in browser
         run: |
+          pip install "playwright>=1.45,<2"
+          python -m playwright install --with-deps chromium
           python - <<'PY'
-          import json
-          import requests
+          from playwright.sync_api import sync_playwright
 
-          headers = {
-              "User-Agent": "Mozilla/5.0",
-              "Accept": "application/json, text/plain, */*",
-              "Content-Type": "application/json",
-              "Referer": "https://cinepoint.com/",
-          }
-          base = "https://cinepoint.com/bff/v1/home/box-office/weekly"
-          variants = [
-              {"type": "all", "limit": 10, "page": 0, "spinneroff": 1},
-              {"type": "all", "limit": 10, "page": 1, "spinneroff": 1},
-              {"type": "all", "rows": 10, "first": 0, "spinneroff": 1},
-              {"type": "all", "spinneroff": 1},
-          ]
-          for params in variants:
-              r = requests.get(base, params=params, headers=headers, timeout=(10, 45))
-              print("URL", r.url)
-              print("STATUS", r.status_code, "CONTENT_TYPE", r.headers.get("content-type"))
-              print("BODY", r.text[:12000])
-              print("---")
+          with sync_playwright() as p:
+              browser = p.chromium.launch(headless=True)
+              page = browser.new_page(viewport={"width": 1440, "height": 1400})
+              page.goto("https://cinepoint.com/", wait_until="domcontentloaded", timeout=90000)
+              page.get_by_text("Weekly", exact=True).first.click(timeout=30000)
+              page.locator("th", has_text="Weekly Adm.").wait_for(timeout=60000)
+
+              print("URL", page.url)
+              print("PERIOD_TEXT", page.get_by_text("Period:", exact=False).first.inner_text())
+              table = page.locator("table").first
+              print("TABLE_TEXT", table.inner_text()[:12000])
+              rows = table.locator("tr")
+              print("ROW_COUNT", rows.count())
+              for i in range(min(rows.count(), 12)):
+                  print("ROW", i, rows.nth(i).inner_text().replace("\n", " | "))
+              print("TABLE_HTML", table.inner_html()[:20000])
+              browser.close()
           PY
 
       - name: Upload failed raw source for parser repair
