@@ -30,29 +30,40 @@ jobs:
         run: python scripts/run_cinema_online.py
 
       # Temporary P1 discovery step. Remove after the Cinepoint collector lands.
-      - name: Probe Cinepoint weekly API response
+      - name: Inspect Cinepoint request params
         run: |
           python - <<'PY'
           import requests
 
-          url = "https://cinepoint.com/bff/v1/movies/top-box-office/weekly"
-          headers = {
-              "User-Agent": "Mozilla/5.0",
-              "Accept": "application/json",
-              "Referer": "https://cinepoint.com/",
-          }
-          candidates = [
-              {},
-              {"page": 0, "size": 20},
-              {"page": 1, "limit": 20},
-              {"page": 1, "per_page": 20},
-          ]
-          for params in candidates:
-              response = requests.get(url, params=params, headers=headers, timeout=(10, 30))
-              print("REQUEST", response.url)
-              print("STATUS", response.status_code, "TYPE", response.headers.get("content-type"), "LEN", len(response.content))
-              print(response.text[:8000])
-              print("---")
+          headers = {"User-Agent": "Mozilla/5.0"}
+          url = "https://cinepoint.com/chunk-TC6ZXBJ4.js"
+          response = requests.get(url, headers=headers, timeout=(10, 45))
+          response.raise_for_status()
+          text = response.text
+
+          needles = (
+              "getTopBoxOfficePage(",
+              "getList(e,n={}",
+              "page_size",
+              "pageSize",
+              "page_index",
+              "pageIndex",
+              "per_page",
+              "limit:",
+              "sort_by",
+              "date_start",
+              "date_end",
+          )
+          for needle in needles:
+              print("###", needle, "COUNT", text.count(needle))
+              start = 0
+              for _ in range(min(30, text.count(needle))):
+                  index = text.find(needle, start)
+                  if index < 0:
+                      break
+                  print(text[max(0, index - 1800): index + 3200])
+                  print("---")
+                  start = index + len(needle)
           PY
 
       - name: Upload failed raw source for parser repair
