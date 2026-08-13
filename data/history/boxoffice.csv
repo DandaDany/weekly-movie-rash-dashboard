@@ -1,1 +1,31 @@
 market,source,period_type,period_start,period_end,rank,previous_rank,previous_rank_label,title_source,movie_id,release_date,distributor,origin,period_gross,currency,period_admissions,period_showtimes,cumulative_gross,cumulative_admissions,is_estimated,source_url,captured_at
+ID,Cinepoint,weekly,2026-08-03,2026-08-09,1,,,Spider-Man: Brand New Day,,,,,,,2193306,82447,,5342590,True,https://cinepoint.com/home,2026-08-13T07:23:10+00:00
+ID,Cinepoint,weekly,2026-08-03,2026-08-09,2,,,The Odyssey,,,,,,,229241,40111,,1805407,True,https://cinepoint.com/home,2026-08-13T07:23:10+00:00
+ID,Cinepoint,weekly,2026-08-03,2026-08-09,3,,,Kado Untuk Ibu,,,,,,,111104,5184,,111104,True,https://cinepoint.com/home,2026-08-13T07:23:10+00:00
+ID,Cinepoint,weekly,2026-08-03,2026-08-09,4,,,Deep Water,,,,,,,79897,3314,,79897,True,https://cinepoint.com/home,2026-08-13T07:23:10+00:00
+ID,Cinepoint,weekly,2026-08-03,2026-08-09,5,,,Sajen Satu Suro,,,,,,,74657,6179,,167252,True,https://cinepoint.com/home,2026-08-13T07:23:10+00:00
+ID,Cinepoint,weekly,2026-08-03,2026-08-09,6,,,Dear You,,,,,,,61655,1655,,61655,True,https://cinepoint.com/home,2026-08-13T07:23:10+00:00
+ID,Cinepoint,weekly,2026-08-03,2026-08-09,7,,,Jangan Buang Ibu,,,,,,,17688,63674,,3351616,True,https://cinepoint.com/home,2026-08-13T07:23:10+00:00
+ID,Cinepoint,weekly,2026-08-03,2026-08-09,8,,,Cek Khodam,,,,,,,14200,15402,,404938,True,https://cinepoint.com/home,2026-08-13T07:23:10+00:00
+ID,Cinepoint,weekly,2026-08-03,2026-08-09,9,,,Maju: Jejak Pahit Si Kembang Gula,,,,,,,14023,1503,,14023,True,https://cinepoint.com/home,2026-08-13T07:23:10+00:00
+ID,Cinepoint,weekly,2026-08-03,2026-08-09,10,,,Moana,,,,,,,11214,29138,,738815,True,https://cinepoint.com/home,2026-08-13T07:23:10+00:00
+MY,Cinema Online,weekend,2026-08-06,2026-08-09,1,1,,Spider-Man: Brand New Day,,2026-07-30,,,,,,,,,False,https://www.cinema.com.my/movies/charts.aspx,2026-08-13T07:22:47+00:00
+MY,Cinema Online,weekend,2026-08-06,2026-08-09,2,2,,The Odyssey,,2026-07-16,,,,,,,,,False,https://www.cinema.com.my/movies/charts.aspx,2026-08-13T07:22:47+00:00
+MY,Cinema Online,weekend,2026-08-06,2026-08-09,3,3,,Jana Nayagan,,2026-07-23,,,,,,,,,False,https://www.cinema.com.my/movies/charts.aspx,2026-08-13T07:22:47+00:00
+MY,Cinema Online,weekend,2026-08-06,2026-08-09,4,,New,DC,,2026-08-07,,,,,,,,,False,https://www.cinema.com.my/movies/charts.aspx,2026-08-13T07:22:47+00:00
+MY,Cinema Online,weekend,2026-08-06,2026-08-09,5,,New,Tiket Sehala,,2026-08-06,,,,,,,,,False,https://www.cinema.com.my/movies/charts.aspx,2026-08-13T07:22:47+00:00
+MY,Cinema Online,weekend,2026-08-06,2026-08-09,6,,New,Siccin 9,,2026-08-06,,,,,,,,,False,https://www.cinema.com.my/movies/charts.aspx,2026-08-13T07:22:47+00:00
+MY,Cinema Online,weekend,2026-08-06,2026-08-09,7,,New,Possessed,,2026-08-06,,,,,,,,,False,https://www.cinema.com.my/movies/charts.aspx,2026-08-13T07:22:47+00:00
+MY,Cinema Online,weekend,2026-08-06,2026-08-09,8,,New,ATEEZ: Light The Way In Cinemas,,2026-08-06,,,,,,,,,False,https://www.cinema.com.my/movies/charts.aspx,2026-08-13T07:22:47+00:00
+MY,Cinema Online,weekend,2026-08-06,2026-08-09,9,,New,2026 Aespa Live Tour - Synk: Complaexity In Cinemas,,2026-08-07,,,,,,,,,False,https://www.cinema.com.my/movies/charts.aspx,2026-08-13T07:22:47+00:00
+MY,Cinema Online,weekend,2026-08-06,2026-08-09,10,4,,Minions & Monsters,,2026-07-01,,,,,,,,,False,https://www.cinema.com.my/movies/charts.aspx,2026-08-13T07:22:47+00:00
+SG,Cinema Online,weekend,2026-08-06,2026-08-09,1,1,,Spider-Man: Brand New Day,,2026-07-30,,,,,,,,,False,https://www.cinema.com.my/movies/charts.aspx,2026-08-13T07:22:47+00:00
+SG,Cinema Online,weekend,2026-08-06,2026-08-09,2,2,,The Odyssey,,2026-07-16,,,,,,,,,False,https://www.cinema.com.my/movies/charts.aspx,2026-08-13T07:22:47+00:00
+SG,Cinema Online,weekend,2026-08-06,2026-08-09,3,,New,Kung Fu Soccer,,2026-08-06,,,,,,,,,False,https://www.cinema.com.my/movies/charts.aspx,2026-08-13T07:22:47+00:00
+SG,Cinema Online,weekend,2026-08-06,2026-08-09,4,,New,Paw Patrol: The Dino Movie,,2026-08-06,,,,,,,,,False,https://www.cinema.com.my/movies/charts.aspx,2026-08-13T07:22:47+00:00
+SG,Cinema Online,weekend,2026-08-06,2026-08-09,5,3,,Dear You,,2026-06-18,,,,,,,,,False,https://www.cinema.com.my/movies/charts.aspx,2026-08-13T07:22:47+00:00
+SG,Cinema Online,weekend,2026-08-06,2026-08-09,6,4,,Minions & Monsters,,2026-07-01,,,,,,,,,False,https://www.cinema.com.my/movies/charts.aspx,2026-08-13T07:22:47+00:00
+SG,Cinema Online,weekend,2026-08-06,2026-08-09,7,6,,Obsession,,2026-06-11,,,,,,,,,False,https://www.cinema.com.my/movies/charts.aspx,2026-08-13T07:22:47+00:00
+SG,Cinema Online,weekend,2026-08-06,2026-08-09,8,7,,Toy Story 5,,2026-06-18,,,,,,,,,False,https://www.cinema.com.my/movies/charts.aspx,2026-08-13T07:22:47+00:00
+SG,Cinema Online,weekend,2026-08-06,2026-08-09,9,5,,Moana,,2026-07-09,,,,,,,,,False,https://www.cinema.com.my/movies/charts.aspx,2026-08-13T07:22:47+00:00
+SG,Cinema Online,weekend,2026-08-06,2026-08-09,10,,New,Girls Like Girls,,2026-08-07,,,,,,,,,False,https://www.cinema.com.my/movies/charts.aspx,2026-08-13T07:22:47+00:00
