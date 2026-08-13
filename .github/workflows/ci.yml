@@ -31,41 +31,50 @@ jobs:
 
       # Temporary P1 discovery step. Remove after the Cinepoint collector lands
       # or is intentionally downgraded to a browser/DOM collector.
-      - name: Inspect Cinepoint request interceptor
+      - name: Probe Cinepoint SSR and weekly route
         run: |
           python - <<'PY'
           import re
           import requests
+          from bs4 import BeautifulSoup
 
           headers = {"User-Agent": "Mozilla/5.0"}
-          url = "https://cinepoint.com/chunk-TC6ZXBJ4.js"
-          r = requests.get(url, headers=headers, timeout=(10, 45))
-          r.raise_for_status()
-          text = r.text
+          urls = [
+              "https://cinepoint.com/pages/tbo",
+              "https://cinepoint.com/pages/tbo?freq=weekly",
+              "https://cinepoint.com/pages/tbo?freq=weekly&country=ALL_COUNTRIES",
+              "https://cinepoint.com/pages/tbo?period=weekly&country=ALL_COUNTRIES",
+          ]
+          for url in urls:
+              r = requests.get(url, headers=headers, timeout=(10, 45))
+              print("URL", r.url, "STATUS", r.status_code, "LEN", len(r.text))
+              print("CONTENT-TYPE", r.headers.get("content-type"))
+              soup = BeautifulSoup(r.text, "html.parser")
+              text = " ".join(soup.stripped_strings)
+              print("TEXT_HEAD", text[:3500])
+              print("HAS_DAILY", "Daily Top Box Office" in text, "HAS_WEEKLY", "Weekly Top Box Office" in text)
+              print("---")
 
-          needles = (
-              "intercept(",
-              "Authorization",
-              "authorization",
-              "api-key",
-              "apiKey",
-              "x-api",
-              "X-API",
-              "x-",
-              "SHA256",
-              "Dr(",
-              "HttpInterceptor",
-              "spinneroff",
-              "response_output",
-          )
-          for needle in needles:
+          js_url = "https://cinepoint.com/chunk-TC6ZXBJ4.js"
+          js = requests.get(js_url, headers=headers, timeout=(10, 45))
+          js.raise_for_status()
+          text = js.text
+          for needle in (
+              "TOP_BOX_OFFICE_PAGE",
+              "loadData(",
+              "countryType",
+              "periodType",
+              "lastLazyEvent",
+              "getTopBoxOffice",
+              "topBoxOffice",
+          ):
               print("###", needle, "COUNT", text.count(needle))
               start = 0
-              for _ in range(min(20, text.count(needle))):
+              for _ in range(min(8, text.count(needle))):
                   i = text.find(needle, start)
                   if i < 0:
                       break
-                  print(text[max(0, i - 2400): i + 4200])
+                  print(text[max(0, i - 1800): i + 5200])
                   print("---")
                   start = i + len(needle)
           PY
