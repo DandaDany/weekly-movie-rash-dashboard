@@ -29,39 +29,36 @@ jobs:
       - name: Live-check Cinema Online parser
         run: python scripts/run_cinema_online.py
 
-      - name: Probe Taiwan weekly source
+      # Temporary P1 discovery step. The public /statistic page returns 403 to
+      # GitHub-hosted runners, so probe only the documented government OpenData
+      # interfaces. Remove this step once the Taiwan collector is implemented.
+      - name: Probe Taiwan OpenData interfaces
         run: |
           python - <<'PY'
           from pathlib import Path
-          import re
           import requests
 
-          response = requests.get(
-              "https://boxofficetw.tfai.org.tw/statistic",
-              timeout=(10, 30),
-              headers={"User-Agent": "Mozilla/5.0"},
-          )
-          response.raise_for_status()
-          Path("taiwan-probe.html").write_text(response.text, encoding="utf-8")
-          print("FINAL_URL", response.url)
-          print("STATUS", response.status_code, "BYTES", len(response.content))
-          print("REFERENCES")
-          for value in re.findall(r'(?:src|href|action)=[\"\']([^\"\']+)', response.text, flags=re.I):
-              lowered = value.lower()
-              if any(key in lowered for key in ("stat", "json", "csv", "open", ".js")):
-                  print(value)
-          print("MATCHING_LINES")
-          for line in response.text.splitlines():
-              lowered = line.lower()
-              if any(key in lowered for key in ("json", "csv", "export", "download", "ajax", "statistic")):
-                  print(line.strip()[:1000])
+          targets = {
+              "oas": "https://opendata.culture.tw/openData/openApi/movie20200601",
+              "since2016": "https://boxofficetw.tfai.org.tw/OpenData/statistic/since2016",
+          }
+          headers = {"User-Agent": "Mozilla/5.0"}
+          for name, url in targets.items():
+              try:
+                  response = requests.get(url, timeout=(10, 60), headers=headers)
+                  print(name, "STATUS", response.status_code, "TYPE", response.headers.get("content-type"), "BYTES", len(response.content))
+                  Path(f"taiwan-probe-{name}.txt").write_text(response.text, encoding="utf-8")
+                  print(response.text[:4000])
+              except Exception as exc:
+                  print(name, "ERROR", type(exc).__name__, str(exc))
           PY
 
       - name: Upload Taiwan probe
         uses: actions/upload-artifact@v4
         with:
           name: taiwan-probe
-          path: taiwan-probe.html
+          path: taiwan-probe-*.txt
+          if-no-files-found: ignore
           retention-days: 1
 
       - name: Upload failed raw source for parser repair
