@@ -32,68 +32,53 @@ jobs:
       - name: Live-check Indonesia
         run: python scripts/run_cinepoint.py
 
-      - name: Probe HKTDC weekly box office endpoint
+      - name: Verify HKTDC weekly box office in normal Chrome
         run: |
           python - <<'PY'
           import json
-          import re
-          import requests
-          from bs4 import BeautifulSoup
-          from urllib.parse import urljoin
+          from playwright.sync_api import sync_playwright
 
+          out = {"responses": []}
           url = "https://hkfilmart.hktdc.com/conference/hkfilmart/en/hong-kong-weekly-box-office"
-          H = {"User-Agent": "Mozilla/5.0", "Accept": "text/html,application/json,*/*"}
-          r = requests.get(url, headers=H, timeout=(10, 45))
-          r.raise_for_status()
-          soup = BeautifulSoup(r.text, "html.parser")
-          out = {
-              "url": r.url,
-              "status": r.status_code,
-              "content_type": r.headers.get("content-type"),
-              "length": len(r.content),
-              "body_text": " ".join(soup.stripped_strings)[:12000],
-              "scripts": [],
-              "inline_hits": [],
-              "script_hits": [],
-          }
+          with sync_playwright() as p:
+              browser = p.chromium.launch(channel="chrome", headless=True)
+              page = browser.new_page(
+                  viewport={"width": 1440, "height": 1800},
+                  locale="en-HK",
+                  timezone_id="Asia/Hong_Kong",
+              )
+              def on_response(resp):
+                  low = resp.url.lower()
+                  if any(k in low for k in ["box", "office", "film", "api", "graphql", "json"]):
+                      out["responses"].append({"status": resp.status, "url": resp.url, "type": resp.headers.get("content-type")})
+              page.on("response", on_response)
+              response = page.goto(url, wait_until="domcontentloaded", timeout=90000)
+              page.wait_for_timeout(8000)
+              out["status"] = response.status if response else None
+              out["url"] = page.url
+              out["title"] = page.title()
+              body = page.locator("body").inner_text()
+              out["body_head"] = body[:16000]
+              out["has_rank"] = "Rank" in body
+              out["has_week_gross"] = "Total Gross this week" in body
+              out["tables"] = []
+              tables = page.locator("table")
+              for i in range(tables.count()):
+                  text = tables.nth(i).inner_text()
+                  if "Rank" in text or "Total Gross" in text:
+                      out["tables"].append({"index": i, "text": text[:20000], "html": tables.nth(i).evaluate("el => el.outerHTML")[:35000]})
+              browser.close()
 
-          needles = re.compile(r"box.?office|weekly|gross|film.?title|release.?date|api|graphql|json", re.I)
-          for tag in soup.find_all("script"):
-              if tag.get("src"):
-                  src = urljoin(r.url, tag.get("src"))
-                  out["scripts"].append(src)
-              else:
-                  text = tag.string or tag.get_text(" ")
-                  if text and needles.search(text):
-                      out["inline_hits"].append(text[:30000])
-
-          for src in out["scripts"]:
-              try:
-                  js = requests.get(src, headers=H, timeout=(10, 30))
-                  if js.status_code != 200:
-                      continue
-                  text = js.text
-                  matches = list(needles.finditer(text))
-                  if not matches:
-                      continue
-                  snippets = []
-                  for m in matches[:40]:
-                      pos = m.start()
-                      snippets.append(text[max(0,pos-700):pos+1800])
-                  out["script_hits"].append({"url": src, "snippets": snippets})
-              except Exception as exc:
-                  out["script_hits"].append({"url": src, "error": f"{type(exc).__name__}: {exc}"})
-
-          with open("hongkong-probe.json", "w", encoding="utf-8") as f:
+          with open("hongkong-browser-probe.json", "w", encoding="utf-8") as f:
               json.dump(out, f, ensure_ascii=False, indent=2)
-          print("HK", r.status_code, "len", len(r.content), "scripts", len(out["scripts"]), "hits", len(out["script_hits"]))
+          print("HK_BROWSER", out.get("status"), out.get("title"), "rank", out.get("has_rank"), "gross", out.get("has_week_gross"), "tables", len(out.get("tables", [])))
           PY
 
-      - name: Upload Hong Kong probe
+      - name: Upload Hong Kong browser probe
         uses: actions/upload-artifact@v4
         with:
-          name: hongkong-probe
-          path: hongkong-probe.json
+          name: hongkong-browser-probe
+          path: hongkong-browser-probe.json
           retention-days: 3
 
       - name: Upload failed raw source for parser repair
