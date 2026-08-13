@@ -30,24 +30,34 @@ jobs:
         run: python scripts/run_cinema_online.py
 
       # Temporary P1 discovery step. Remove after the Cinepoint collector lands.
-      - name: Verify Cinepoint weekly API path
+      - name: Inspect Cinepoint TopBoxOffice module
         run: |
           python - <<'PY'
+          import re
           import requests
 
           headers = {"User-Agent": "Mozilla/5.0"}
-          base = "https://cinepoint.com/bff/v1/movies/top-box-office"
-          queries = {
-              "daily-list": f"{base}/daily?date_end=2026-08-13&type=all&sub_period=month&page=0&limit=10",
-              "weekly-list": f"{base}/weekly?date_end=2026-08-13&type=all&sub_period=month&page=0&limit=10",
-              "weekly-detail": f"{base}/weekly/detail?date_start=2026-08-10&date_end=2026-08-16&type=all&limit=10",
-              "monthly-list": f"{base}/monthly?date_end=2026-08-13&type=all&page=0&limit=10",
-              "yearly-list": f"{base}/yearly?date_end=2026-08-13&type=all&page=0&limit=10",
-          }
-          for name, url in queries.items():
-              response = requests.get(url, timeout=(10, 45), headers=headers)
-              print(name, response.status_code, response.headers.get("content-type"), len(response.content))
-              print(response.text[:3000])
+          url = "https://cinepoint.com/chunk-Q6ECZFTZ.js"
+          response = requests.get(url, timeout=(10, 45), headers=headers)
+          response.raise_for_status()
+          text = response.text
+          print("CHUNK", response.status_code, len(response.content))
+
+          needles = ("top-box-office", "weekly", "monthly", "yearly", "/bff/", "/v1/")
+          for needle in needles:
+              print("NEEDLE", needle, "COUNT", text.lower().count(needle.lower()))
+              start = 0
+              for _ in range(min(12, text.lower().count(needle.lower()))):
+                  index = text.lower().find(needle.lower(), start)
+                  if index < 0:
+                      break
+                  print(text[max(0, index - 700): index + 1500])
+                  start = index + len(needle)
+
+          print("PATHS")
+          candidates = sorted(set(re.findall(r'["\']([^"\']*(?:top-box-office|box-office)[^"\']*)["\']', text, flags=re.I)))
+          for candidate in candidates:
+              print(candidate)
           PY
 
       - name: Upload failed raw source for parser repair
