@@ -41,7 +41,7 @@ In particular, Taiwan's cumulative `since2016` dataset must not be sorted and pr
 
 ## Source strategy
 
-Cinema Online is fetched with plain HTTP and parsed with BeautifulSoup.
+Cinema Online is fetched with plain HTTP and parsed with BeautifulSoup. The current desktop markup separates poster and title cells, so the parser anchors `Previous Week` and `Release Date` from the final two cells. It also fails closed if either semantic field cannot be parsed, preventing silent column drift.
 
 Cinepoint is the one P1 browser exception. Its public homepage exposes the weekly chart, but direct anonymous BFF calls are rejected. Rather than reproduce private request signing/interceptor behavior, the collector opens the public homepage in Chrome, clicks the visible `Weekly` tab, waits for data rows, and parses the rendered HTML.
 
@@ -87,7 +87,18 @@ Daily polling is intentional. Different sources publish on different weekdays, a
 
 If the source data does not change, the workflow makes no Git commit.
 
-PR CI runs regression tests plus live MY/SG/ID checks and uploads the resulting `live-data-preview` artifact. This makes the exact normalized output inspectable without committing temporary CI data.
+PR CI runs regression tests plus live MY/SG/ID checks, launches the static dashboard in Chrome for a user-facing smoke test, and uploads the resulting `live-data-preview` artifact.
+
+Current P1 acceptance covers:
+
+- five regression tests;
+- MY + SG live: 20 valid records, including Previous Week and Release Date semantics;
+- ID live: 10 valid weekly records;
+- dashboard: six market tabs, live ID ranking metrics, blocked-source empty state, and MY ranking fields.
+
+## Deployment
+
+`.github/workflows/pages.yml` deploys `public/` to GitHub Pages only after changes to `public/**` land on `main`, or by explicit manual dispatch. Draft PR work does not deploy automatically.
 
 ## Maintenance rule
 
@@ -112,6 +123,7 @@ The pipeline intentionally fails closed. Examples:
 - table cannot be found;
 - fewer than five ranks are parsed;
 - ranks are duplicated;
+- expected semantic fields such as Cinema Online Previous Week / Release Date cannot be parsed;
 - period dates are invalid.
 
 When this happens GitHub Actions turns red and existing normalized history remains intact. When rendered/source HTML is available, it is retained under `data/raw/<collector>/failures/` for offline repair.
