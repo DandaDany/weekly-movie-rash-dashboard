@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from boxoffice.collectors.base import Collector
+from boxoffice.collectors.base import Collector, SourceUnavailableError
 from boxoffice.storage import (
     build_public_json,
     build_public_status,
@@ -28,6 +28,7 @@ def run_collector(collector: Collector) -> dict:
         "collector": collector.name,
         "started_at": started.isoformat(),
         "success": False,
+        "availability": "unknown",
     }
     result = None
 
@@ -59,6 +60,7 @@ def run_collector(collector: Collector) -> dict:
         status.update(
             {
                 "success": True,
+                "availability": "live",
                 "finished_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
                 "source_url": result.source_url,
                 "records": len(records),
@@ -77,6 +79,14 @@ def run_collector(collector: Collector) -> dict:
                 failed_at=started.isoformat(),
             )
             status["failed_raw_snapshot"] = str(failed_raw.relative_to(ROOT))
+
+        if isinstance(exc, SourceUnavailableError):
+            status["availability"] = "unavailable"
+            status["reason"] = exc.reason
+            if exc.source_url:
+                status["source_url"] = exc.source_url
+        else:
+            status["availability"] = "failed"
 
         status.update(
             {

@@ -26,11 +26,8 @@ jobs:
       - name: Run regression tests
         run: pytest -q
 
-      - name: Live-check Malaysia + Singapore
-        run: python scripts/run_cinema_online.py
-
-      - name: Live-check Indonesia
-        run: python scripts/run_cinepoint.py
+      - name: Run all source collectors
+        run: python scripts/run_all.py
 
       - name: Dashboard smoke test
         run: |
@@ -67,6 +64,21 @@ jobs:
               browser.close()
           PY
 
+      - name: Verify unavailable-source status contract
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          status = json.loads(Path("public/data/status.json").read_text(encoding="utf-8"))
+          for collector in ("taiwan", "vietnam", "hong_kong"):
+              assert collector in status, collector
+              assert status[collector]["availability"] == "unavailable", status[collector]
+              assert status[collector]["success"] is False
+          assert status["cinema_online"]["availability"] == "live"
+          assert status["cinepoint"]["availability"] == "live"
+          PY
+
       - name: Upload live data preview
         uses: actions/upload-artifact@v4
         with:
@@ -75,8 +87,7 @@ jobs:
             public/data/**
             data/history/boxoffice.csv
             data/meta/crawl_status/**
-            data/raw/cinema_online/**
-            data/raw/cinepoint/**
+            data/raw/**
           retention-days: 3
 
       - name: Upload failed raw source for parser repair
