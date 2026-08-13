@@ -29,30 +29,25 @@ jobs:
       - name: Live-check Cinema Online parser
         run: python scripts/run_cinema_online.py
 
-      # Temporary P1 discovery step. Read Cinepoint's server-rendered Angular
-      # transfer state instead of crawling minified/lazy JavaScript chunks.
-      - name: Inspect Cinepoint TBO SSR requests
+      # Temporary P1 discovery step. Remove after the Cinepoint collector lands.
+      - name: Verify Cinepoint weekly API path
         run: |
           python - <<'PY'
-          import re
           import requests
 
           headers = {"User-Agent": "Mozilla/5.0"}
-          for page_url in ("https://cinepoint.com/", "https://cinepoint.com/pages/tbo"):
-              response = requests.get(page_url, timeout=(10, 45), headers=headers)
-              response.raise_for_status()
-              print("PAGE", page_url, response.status_code, len(response.content))
-              urls = sorted(set(re.findall(r'"u":"([^"]+)"', response.text)))
-              for value in urls:
-                  if any(key in value.lower() for key in ("box-office", "tbo", "movie")):
-                      print("SSR", value)
-
-          # Verify same-origin BFF routes directly. These are public GETs used by
-          # the Cinepoint frontend; no authentication or browser automation.
-          for period in ("daily", "weekly", "monthly", "yearly"):
-              url = f"https://cinepoint.com/bff/v1/home/box-office/{period}?limit=10&page=0&type=all"
+          base = "https://cinepoint.com/bff/v1/movies/top-box-office"
+          queries = {
+              "daily-list": f"{base}/daily?date_end=2026-08-13&type=all&sub_period=month&page=0&limit=10",
+              "weekly-list": f"{base}/weekly?date_end=2026-08-13&type=all&sub_period=month&page=0&limit=10",
+              "weekly-detail": f"{base}/weekly/detail?date_start=2026-08-10&date_end=2026-08-16&type=all&limit=10",
+              "monthly-list": f"{base}/monthly?date_end=2026-08-13&type=all&page=0&limit=10",
+              "yearly-list": f"{base}/yearly?date_end=2026-08-13&type=all&page=0&limit=10",
+          }
+          for name, url in queries.items():
               response = requests.get(url, timeout=(10, 45), headers=headers)
-              print("BFF", period, response.status_code, response.headers.get("content-type"), len(response.content), response.text[:800])
+              print(name, response.status_code, response.headers.get("content-type"), len(response.content))
+              print(response.text[:3000])
           PY
 
       - name: Upload failed raw source for parser repair
