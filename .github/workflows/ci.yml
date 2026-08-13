@@ -32,6 +32,41 @@ jobs:
       - name: Live-check Indonesia
         run: python scripts/run_cinepoint.py
 
+      - name: Dashboard smoke test
+        run: |
+          python -m http.server 8765 --directory public >/tmp/dashboard.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID' EXIT
+          python - <<'PY'
+          from playwright.sync_api import sync_playwright
+
+          with sync_playwright() as p:
+              browser = p.chromium.launch(channel="chrome", headless=True)
+              page = browser.new_page(viewport={"width": 1440, "height": 1200})
+              page.goto("http://127.0.0.1:8765/", wait_until="networkidle", timeout=30000)
+
+              assert page.locator(".market-tab").count() == 6
+              page.locator("tbody tr").first.wait_for(timeout=10000)
+              assert page.locator("tbody tr").count() == 10
+              assert "印尼票房排行" in page.locator("#marketTitle").inner_text()
+              id_headers = page.locator("thead").inner_text()
+              assert "本期人次" in id_headers
+              assert "場次" in id_headers
+              assert "累計人次" in id_headers
+
+              page.locator('[data-market="TW"]').click()
+              page.locator("#emptyState").wait_for(state="visible", timeout=5000)
+              assert "自動更新尚未接通" in page.locator("#emptyState").inner_text()
+
+              page.locator('[data-market="MY"]').click()
+              page.locator("tbody tr").first.wait_for(timeout=5000)
+              assert page.locator("tbody tr").count() == 10
+              my_headers = page.locator("thead").inner_text()
+              assert "上週" in my_headers
+              assert "上映日" in my_headers
+              browser.close()
+          PY
+
       - name: Upload live data preview
         uses: actions/upload-artifact@v4
         with:
