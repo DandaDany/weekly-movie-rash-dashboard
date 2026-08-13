@@ -32,53 +32,14 @@ jobs:
       - name: Live-check Indonesia
         run: python scripts/run_cinepoint.py
 
-      - name: Verify HKTDC weekly box office in normal Chrome
-        run: |
-          python - <<'PY'
-          import json
-          from playwright.sync_api import sync_playwright
-
-          out = {"responses": []}
-          url = "https://hkfilmart.hktdc.com/conference/hkfilmart/en/hong-kong-weekly-box-office"
-          with sync_playwright() as p:
-              browser = p.chromium.launch(channel="chrome", headless=True)
-              page = browser.new_page(
-                  viewport={"width": 1440, "height": 1800},
-                  locale="en-HK",
-                  timezone_id="Asia/Hong_Kong",
-              )
-              def on_response(resp):
-                  low = resp.url.lower()
-                  if any(k in low for k in ["box", "office", "film", "api", "graphql", "json"]):
-                      out["responses"].append({"status": resp.status, "url": resp.url, "type": resp.headers.get("content-type")})
-              page.on("response", on_response)
-              response = page.goto(url, wait_until="domcontentloaded", timeout=90000)
-              page.wait_for_timeout(8000)
-              out["status"] = response.status if response else None
-              out["url"] = page.url
-              out["title"] = page.title()
-              body = page.locator("body").inner_text()
-              out["body_head"] = body[:16000]
-              out["has_rank"] = "Rank" in body
-              out["has_week_gross"] = "Total Gross this week" in body
-              out["tables"] = []
-              tables = page.locator("table")
-              for i in range(tables.count()):
-                  text = tables.nth(i).inner_text()
-                  if "Rank" in text or "Total Gross" in text:
-                      out["tables"].append({"index": i, "text": text[:20000], "html": tables.nth(i).evaluate("el => el.outerHTML")[:35000]})
-              browser.close()
-
-          with open("hongkong-browser-probe.json", "w", encoding="utf-8") as f:
-              json.dump(out, f, ensure_ascii=False, indent=2)
-          print("HK_BROWSER", out.get("status"), out.get("title"), "rank", out.get("has_rank"), "gross", out.get("has_week_gross"), "tables", len(out.get("tables", [])))
-          PY
-
-      - name: Upload Hong Kong browser probe
+      - name: Upload live data preview
         uses: actions/upload-artifact@v4
         with:
-          name: hongkong-browser-probe
-          path: hongkong-browser-probe.json
+          name: live-data-preview
+          path: |
+            public/data/**
+            data/history/boxoffice.csv
+            data/meta/crawl_status/**
           retention-days: 3
 
       - name: Upload failed raw source for parser repair
