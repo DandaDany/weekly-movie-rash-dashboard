@@ -1,0 +1,12 @@
+{
+  "collector": "cinema_online",
+  "started_at": "2026-08-13T07:37:58+00:00",
+  "success": true,
+  "finished_at": "2026-08-13T07:38:00+00:00",
+  "source_url": "https://www.cinema.com.my/movies/charts.aspx?date=8/9/2026",
+  "records": 20,
+  "new_history_rows": 0,
+  "period_start": "2026-08-06",
+  "period_end": "2026-08-09",
+  "raw_snapshot": "data/raw/cinema_online/2026-08-06_2026-08-09_1d63ae84e8b5.html"
+}
