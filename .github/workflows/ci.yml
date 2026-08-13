@@ -32,6 +32,47 @@ jobs:
       - name: Live-check Indonesia
         run: python scripts/run_cinepoint.py
 
+      - name: Probe Taiwan TFAI weekly export
+        run: |
+          python - <<'PY'
+          import re
+          import requests
+          from bs4 import BeautifulSoup
+
+          headers = {"User-Agent": "Mozilla/5.0"}
+          urls = [
+              "https://boxofficetw.tfai.org.tw/statistic",
+              "https://boxofficetw.tfai.org.tw/statistic/Week/10/0/all/False/ReleaseDate/2026-08-09?End=2026-08-09",
+              "https://boxofficetw.tfai.org.tw/statistic/Week/10/0/all/False/ReleaseDate/2026-08-12?End=2026-08-12",
+          ]
+          for url in urls:
+              r = requests.get(url, headers=headers, timeout=(10, 45), allow_redirects=True)
+              print("URL", r.url, "STATUS", r.status_code, "TYPE", r.headers.get("content-type"), "LEN", len(r.content))
+              print("DISPOSITION", r.headers.get("content-disposition"))
+              print("HEAD", r.text[:1200])
+              if "html" in (r.headers.get("content-type") or ""):
+                  soup = BeautifulSoup(r.text, "html.parser")
+                  print("TITLE", soup.title.get_text(" ", strip=True) if soup.title else None)
+                  for form in soup.find_all("form"):
+                      print("FORM", form.get("method"), form.get("action"), [(x.get("name"), x.get("value")) for x in form.find_all(["input","select"])][:20])
+                  for tag in soup.find_all(["a", "button"]):
+                      text = " ".join(tag.stripped_strings)
+                      attrs = {k:v for k,v in tag.attrs.items() if k in {"href","onclick","id","class","data-type","data-url"}}
+                      if text in {"Excel","PDF","JSON","CSV"} or any(k in str(attrs).lower() for k in ("json","csv","excel","export")):
+                          print("EXPORT_TAG", text, attrs)
+                  scripts = [s.get("src") for s in soup.find_all("script") if s.get("src")]
+                  print("SCRIPTS", scripts[-15:])
+                  for s in soup.find_all("script"):
+                      txt = s.string or s.get_text(" ")
+                      if any(n in txt.lower() for n in ["json", "csv", "export", "excel"]):
+                          print("INLINE_SCRIPT", txt[:10000])
+                  tables = soup.find_all("table")
+                  print("TABLES", len(tables))
+                  for i, table in enumerate(tables[:5]):
+                      print("TABLE", i, "TEXT", " | ".join(table.stripped_strings)[:8000])
+              print("---")
+          PY
+
       - name: Upload failed raw source for parser repair
         if: failure()
         uses: actions/upload-artifact@v4
