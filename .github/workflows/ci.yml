@@ -32,49 +32,80 @@ jobs:
       - name: Live-check Indonesia
         run: python scripts/run_cinepoint.py
 
-      - name: Capture Taiwan current distribution list
+      - name: Probe Box Office Vietnam public weekend table
         run: |
           python - <<'PY'
           import json
+          import re
           import requests
+          from bs4 import BeautifulSoup
 
-          url = "https://opendata.culture.tw/frontsite/openData/findDetail"
-          r = requests.get(
-              url,
-              params={"datasetId": 668},
-              headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"},
-              timeout=(10, 45),
-          )
-          payload = {
+          url = "https://v1.boxofficevietnam.com/"
+          r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=(10, 45))
+          r.raise_for_status()
+          soup = BeautifulSoup(r.text, "html.parser")
+          out = {
               "url": r.url,
               "status": r.status_code,
               "content_type": r.headers.get("content-type"),
               "length": len(r.content),
+              "inputs": [],
+              "weekend_candidates": [],
+              "scripts": [],
           }
-          if r.ok:
-              data = r.json()
-              payload.update({
-                  "title": data.get("title"),
-                  "description": data.get("description"),
-                  "publisher": data.get("publisher"),
-                  "accrualperiodicity": data.get("accrualperiodicity"),
-                  "issued": data.get("issued"),
-                  "modifyDate": data.get("modifyDate"),
-                  "distributionDetailList": data.get("distributionDetailList"),
-              })
-          else:
-              payload["body_head"] = r.text[:5000]
 
-          with open("taiwan-distribution-probe.json", "w", encoding="utf-8") as f:
-              json.dump(payload, f, ensure_ascii=False, indent=2)
-          print(json.dumps({k:v for k,v in payload.items() if k != "distributionDetailList"}, ensure_ascii=False))
+          for inp in soup.find_all(["input", "select", "option"]):
+              attrs = {k:v for k,v in inp.attrs.items() if k in {"id","name","value","class","type","data-date","data-start","data-end"}}
+              text = " ".join(inp.stripped_strings)
+              s = (str(attrs) + " " + text).lower()
+              if any(k in s for k in ["date", "week", "start", "end", "from", "to"]):
+                  out["inputs"].append({"tag": inp.name, "text": text, "attrs": attrs})
+
+          marker = soup.find(string=re.compile(r"Doanh\s+Thu\s+Cuối\s+Tuần", re.I))
+          if marker:
+              node = marker.parent
+              for parent in [node] + list(node.parents)[:6]:
+                  tables = parent.find_all("table") if hasattr(parent, "find_all") else []
+                  if tables:
+                      for table in tables[:3]:
+                          rows = []
+                          for tr in table.find_all("tr")[:40]:
+                              cells = [" ".join(c.stripped_strings) for c in tr.find_all(["th","td"])]
+                              if cells:
+                                  rows.append(cells)
+                          out["weekend_candidates"].append({
+                              "parent": getattr(parent, "name", None),
+                              "table_attrs": table.attrs,
+                              "rows": rows,
+                              "html_head": str(table)[:12000],
+                          })
+                      break
+
+          for tag in soup.find_all("script", src=True):
+              src = tag.get("src")
+              if src:
+                  out["scripts"].append(src)
+
+          # Capture inline JS clues for date/weekend/AJAX endpoints.
+          inline = []
+          for tag in soup.find_all("script"):
+              text = tag.string or tag.get_text(" ")
+              if not text:
+                  continue
+              if re.search(r"weekend|cuoi|cuối|ajax|api|date|doanh", text, re.I):
+                  inline.append(text[:12000])
+          out["inline_scripts"] = inline[:20]
+
+          with open("vietnam-probe.json", "w", encoding="utf-8") as f:
+              json.dump(out, f, ensure_ascii=False, indent=2)
+          print("VN", r.status_code, "tables", len(out["weekend_candidates"]), "inputs", len(out["inputs"]))
           PY
 
-      - name: Upload Taiwan distribution probe
+      - name: Upload Vietnam probe
         uses: actions/upload-artifact@v4
         with:
-          name: taiwan-distribution-probe
-          path: taiwan-distribution-probe.json
+          name: vietnam-probe
+          path: vietnam-probe.json
           retention-days: 3
 
       - name: Upload failed raw source for parser repair
