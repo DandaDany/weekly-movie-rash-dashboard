@@ -6,14 +6,14 @@ const MARKET_CONFIG = {
     status: "blocked",
     source: "TFAI 全國電影票房統計",
     sourceUrl: "https://boxofficetw.tfai.org.tw/",
-    note: "官方週票房目前無法由 GitHub-hosted runner 穩定取得；現行開放下載為 2016 年起累計資料，不能當成單週榜。",
+    note: "官方首頁週榜 parser 已完成；GitHub-hosted runner 目前仍被來源存取控制擋下。若未來可正常取得，會自動切換為 live。",
   },
   HK: {
     label: "香港",
     status: "blocked",
     source: "HKTDC FILMART",
     sourceUrl: "https://hkfilmart.hktdc.com/conference/hkfilmart/en/hong-kong-weekly-box-office",
-    note: "公開週榜對 GitHub-hosted runner 回傳 403；P1 不繞過來源存取控制。",
+    note: "公開來源目前可連線，但尚未取得可穩定驗證的週榜表格契約。",
   },
   VN: {
     label: "越南",
@@ -378,15 +378,16 @@ async function boot() {
   state.status = status && typeof status === "object" ? status : {};
 
   const firstMarketWithData = MARKET_ORDER.find((market) => marketRows(market).length);
-  state.market = firstMarketWithData || "ID";
+  state.market = firstMarketWithData || MARKET_ORDER[0];
 
   els.periodSelect.addEventListener("change", (event) => {
     state.periodKey = event.target.value || null;
     renderSourceCard();
     renderTable();
   });
+
   els.movieSearch.addEventListener("input", (event) => {
-    state.search = event.target.value;
+    state.search = event.target.value || "";
     renderTable();
   });
 
