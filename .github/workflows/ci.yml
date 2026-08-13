@@ -30,9 +30,10 @@ jobs:
         run: python scripts/run_cinema_online.py
 
       # Temporary P1 discovery step. Remove after the Cinepoint collector lands.
-      - name: Resolve Cinepoint TopBoxOffice endpoint constants
+      - name: Resolve Cinepoint API base URL
         run: |
           python - <<'PY'
+          import re
           import requests
 
           headers = {"User-Agent": "Mozilla/5.0"}
@@ -42,15 +43,21 @@ jobs:
           text = response.text
           print("CHUNK", response.status_code, len(response.content))
 
-          for needle in ("TOP_BOX_OFFICE_PAGE", "TOP_BOX_OFFICE_DETAIL", "TOP_BOX_OFFICE:"):
+          for needle in ("apiUrl", "api_url", "https://", "TOP_BOX_OFFICE_PAGE"):
               print("NEEDLE", needle, "COUNT", text.count(needle))
               start = 0
-              for _ in range(min(10, text.count(needle))):
+              for _ in range(min(20, text.count(needle))):
                   index = text.find(needle, start)
                   if index < 0:
                       break
-                  print(text[max(0, index - 2200): index + 3200])
+                  print(text[max(0, index - 900): index + 1600])
                   start = index + len(needle)
+
+          urls = sorted(set(re.findall(r'https://[^"\'`\\ ]+', text)))
+          print("URL_CANDIDATES")
+          for candidate in urls[:200]:
+              if "cine" in candidate.lower() or "api" in candidate.lower():
+                  print(candidate)
           PY
 
       - name: Upload failed raw source for parser repair
