@@ -105,9 +105,10 @@ def _previous_rank(text: str) -> tuple[Optional[int], Optional[str]]:
 class CinemaOnlineCollector(Collector):
     """Malaysia + Singapore weekend charts from one public HTML page.
 
-    Parser intentionally relies on semantic headings + neighboring tables rather
-    than brittle CSS class names. This makes it more tolerant of cosmetic HTML
-    redesigns.
+    Parser intentionally relies on semantic headings + their owning table rather
+    than brittle CSS class names. The live site currently places each heading
+    inside its chart table, while older/simplified markup may place it just before
+    the table, so both layouts are supported.
     """
 
     name = "cinema_online"
@@ -145,7 +146,9 @@ class CinemaOnlineCollector(Collector):
                 raise ValueError(f"Could not find {market} chart heading")
 
             heading_tag = heading.parent
-            table = heading_tag.find_next("table") if heading_tag else None
+            table = heading_tag.find_parent("table") if heading_tag else None
+            if table is None and heading_tag is not None:
+                table = heading_tag.find_next("table")
             if table is None:
                 raise ValueError(f"Could not find {market} chart table")
 
