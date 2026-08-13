@@ -28,3 +28,12 @@ jobs:
 
       - name: Live-check Cinema Online parser
         run: python scripts/run_cinema_online.py
+
+      - name: Upload failed raw source for parser repair
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failed-raw-source
+          path: data/raw/**/failures/**
+          if-no-files-found: ignore
+          retention-days: 14
