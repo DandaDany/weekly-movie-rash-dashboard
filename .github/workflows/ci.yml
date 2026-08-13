@@ -32,27 +32,52 @@ jobs:
       - name: Live-check Indonesia
         run: python scripts/run_cinepoint.py
 
-      - name: Probe Taiwan government open data API
+      - name: Inspect Taiwan dataset metadata resources
         run: |
           python - <<'PY'
           import json
+          import re
           import requests
 
-          urls = [
-              "https://data.gov.tw/api/v2/rest/dataset/94224",
-              "https://data.nat.gov.tw/api/v2/rest/dataset/94224",
-              "https://opendata.culture.tw/openData/openApi/movie20200601",
-          ]
-          headers = {"User-Agent": "Mozilla/5.0", "Accept": "application/json,text/plain,*/*"}
-          for url in urls:
+          url = "https://data.gov.tw/api/v2/rest/dataset/94224"
+          r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=(10, 45))
+          r.raise_for_status()
+          result = r.json()["result"]
+          print("TOP_KEYS", sorted(result.keys()))
+
+          found = []
+          def walk(value, path="result"):
+              if isinstance(value, dict):
+                  for key, child in value.items():
+                      walk(child, f"{path}.{key}")
+              elif isinstance(value, list):
+                  for i, child in enumerate(value):
+                      walk(child, f"{path}[{i}]")
+              elif isinstance(value, str):
+                  low = value.lower()
+                  if (
+                      "http" in low
+                      or ".csv" in low
+                      or ".json" in low
+                      or "parameter" in path.lower()
+                      or "resource" in path.lower()
+                      or "oas" in path.lower()
+                  ):
+                      found.append((path, value))
+
+          walk(result)
+          for path, value in found:
+              print("VALUE", path, value[:4000])
+          print("FOUND_COUNT", len(found))
+
+          # Also inspect likely machine-readable metadata variants exposed by data.gov.tw.
+          for suffix in ["?format=json", "/dcat", "/rdf", "/history"]:
+              probe = "https://data.gov.tw/api/v2/rest/dataset/94224" + suffix
               try:
-                  r = requests.get(url, headers=headers, timeout=(10, 45), allow_redirects=True)
-                  print("URL", r.url)
-                  print("STATUS", r.status_code, "TYPE", r.headers.get("content-type"), "LEN", len(r.content))
-                  print("BODY", r.text[:30000])
+                  rr = requests.get(probe, headers={"User-Agent": "Mozilla/5.0"}, timeout=(10, 30))
+                  print("PROBE", probe, rr.status_code, rr.headers.get("content-type"), rr.text[:5000])
               except Exception as exc:
-                  print("ERROR", url, type(exc).__name__, str(exc))
-              print("---")
+                  print("PROBE_ERROR", probe, type(exc).__name__, str(exc))
           PY
 
       - name: Upload failed raw source for parser repair
