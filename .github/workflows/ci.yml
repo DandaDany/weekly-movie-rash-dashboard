@@ -29,67 +29,31 @@ jobs:
       - name: Live-check Cinema Online parser
         run: python scripts/run_cinema_online.py
 
-      # Temporary P1 discovery step. This is non-blocking and will be removed
-      # once each remaining source has a production collector.
-      - name: Capture Cinepoint TBO SSR and lazy chunks
+      # Temporary P1 discovery step. Read Cinepoint's server-rendered Angular
+      # transfer state instead of crawling minified/lazy JavaScript chunks.
+      - name: Inspect Cinepoint TBO SSR requests
         run: |
           python - <<'PY'
           import re
-          from pathlib import Path
-          from urllib.parse import urljoin
           import requests
 
           headers = {"User-Agent": "Mozilla/5.0"}
-          asset_dir = Path("discovery/cinepoint")
-          asset_dir.mkdir(parents=True, exist_ok=True)
-
-          for page_name, page_url in {
-              "home": "https://cinepoint.com/",
-              "tbo": "https://cinepoint.com/pages/tbo",
-          }.items():
+          for page_url in ("https://cinepoint.com/", "https://cinepoint.com/pages/tbo"):
               response = requests.get(page_url, timeout=(10, 45), headers=headers)
               response.raise_for_status()
-              asset_dir.joinpath(f"{page_name}.html").write_text(response.text, encoding="utf-8")
-              print(page_name, response.status_code, len(response.content))
-
-              script_urls = [urljoin(response.url, value) for value in re.findall(r'<script[^>]+src=["\']([^"\']+)', response.text, flags=re.I)]
-              for script_url in script_urls:
-                  if "cinepoint.com" not in script_url:
-                      continue
-                  js_response = requests.get(script_url, timeout=(10, 60), headers=headers)
-                  js_response.raise_for_status()
-                  filename = script_url.rsplit("/", 1)[-1].split("?", 1)[0]
-                  js_text = js_response.text
-                  asset_dir.joinpath(filename).write_text(js_text, encoding="utf-8")
-
-                  # Angular lazy chunks are referenced by filename in main.js.
-                  chunk_names = sorted(set(re.findall(r'(chunk-[A-Z0-9]+\.js)', js_text)))
-                  for chunk_name in chunk_names:
-                      chunk_url = urljoin(script_url, chunk_name)
-                      chunk_response = requests.get(chunk_url, timeout=(10, 60), headers=headers)
-                      if chunk_response.status_code != 200:
-                          print("CHUNK_FAIL", chunk_name, chunk_response.status_code)
-                          continue
-                      asset_dir.joinpath(chunk_name).write_text(chunk_response.text, encoding="utf-8")
-                      print("CHUNK", chunk_name, len(chunk_response.content))
-
-          # Print SSR request URLs so the endpoint can be implemented without a browser.
-          for html_path in sorted(asset_dir.glob("*.html")):
-              text = html_path.read_text(encoding="utf-8")
-              urls = sorted(set(re.findall(r'"u":"([^"]+)"', text)))
-              print("SSR_URLS", html_path.name)
+              print("PAGE", page_url, response.status_code, len(response.content))
+              urls = sorted(set(re.findall(r'"u":"([^"]+)"', response.text)))
               for value in urls:
                   if any(key in value.lower() for key in ("box-office", "tbo", "movie")):
-                      print(" ", value)
-          PY
+                      print("SSR", value)
 
-      - name: Upload Cinepoint discovery assets
-        uses: actions/upload-artifact@v4
-        with:
-          name: cinepoint-discovery
-          path: discovery/cinepoint/
-          if-no-files-found: error
-          retention-days: 1
+          # Verify same-origin BFF routes directly. These are public GETs used by
+          # the Cinepoint frontend; no authentication or browser automation.
+          for period in ("daily", "weekly", "monthly", "yearly"):
+              url = f"https://cinepoint.com/bff/v1/home/box-office/{period}?limit=10&page=0&type=all"
+              response = requests.get(url, timeout=(10, 45), headers=headers)
+              print("BFF", period, response.status_code, response.headers.get("content-type"), len(response.content), response.text[:800])
+          PY
 
       - name: Upload failed raw source for parser repair
         if: failure()
