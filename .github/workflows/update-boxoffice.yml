@@ -1,0 +1,49 @@
+name: Update box office data
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Daily 10:30 Asia/Taipei = 02:30 UTC.
+    # Daily polling is intentional: source sites update on different weekdays.
+    - cron: "30 2 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: boxoffice-update
+  cancel-in-progress: false
+
+jobs:
+  update-cinema-online:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install -e ".[test]"
+
+      - name: Run parser/storage tests
+        run: pytest -q
+
+      - name: Run Malaysia + Singapore collector
+        run: python scripts/run_cinema_online.py
+
+      - name: Commit only when data changed
+        run: |
+          if git diff --quiet; then
+            echo "No data changes."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data public
+          git commit -m "data: update box office charts"
+          git push
