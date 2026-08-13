@@ -29,37 +29,37 @@ jobs:
       - name: Live-check Cinema Online parser
         run: python scripts/run_cinema_online.py
 
-      # Temporary P1 discovery step. The public /statistic page returns 403 to
-      # GitHub-hosted runners, so probe only the documented government OpenData
-      # interfaces. Remove this step once the Taiwan collector is implemented.
-      - name: Probe Taiwan OpenData interfaces
+      # Temporary P1 discovery step. This is non-blocking and will be removed
+      # once each remaining source has a production collector.
+      - name: Probe remaining source connectivity
         run: |
           python - <<'PY'
-          from pathlib import Path
+          import re
           import requests
 
           targets = {
-              "oas": "https://opendata.culture.tw/openData/openApi/movie20200601",
-              "since2016": "https://boxofficetw.tfai.org.tw/OpenData/statistic/since2016",
+              "TW": "https://boxofficetw.tfai.org.tw/OpenData/statistic/since2016",
+              "VN": "https://v1.boxofficevietnam.com/",
+              "HK": "https://hkfilmart.hktdc.com/conference/hkfilmart/tc/hong-kong-weekly-box-office",
+              "ID": "https://cinepoint.com/",
           }
           headers = {"User-Agent": "Mozilla/5.0"}
-          for name, url in targets.items():
+          for market, url in targets.items():
               try:
-                  response = requests.get(url, timeout=(10, 60), headers=headers)
-                  print(name, "STATUS", response.status_code, "TYPE", response.headers.get("content-type"), "BYTES", len(response.content))
-                  Path(f"taiwan-probe-{name}.txt").write_text(response.text, encoding="utf-8")
-                  print(response.text[:4000])
+                  response = requests.get(url, timeout=(10, 45), headers=headers, allow_redirects=True)
+                  title_match = re.search(r"<title[^>]*>(.*?)</title>", response.text, flags=re.I | re.S)
+                  title = " ".join(title_match.group(1).split())[:160] if title_match else ""
+                  print(
+                      market,
+                      "STATUS", response.status_code,
+                      "BYTES", len(response.content),
+                      "TYPE", response.headers.get("content-type"),
+                      "FINAL", response.url,
+                      "TITLE", title,
+                  )
               except Exception as exc:
-                  print(name, "ERROR", type(exc).__name__, str(exc))
+                  print(market, "ERROR", type(exc).__name__, str(exc))
           PY
-
-      - name: Upload Taiwan probe
-        uses: actions/upload-artifact@v4
-        with:
-          name: taiwan-probe
-          path: taiwan-probe-*.txt
-          if-no-files-found: ignore
-          retention-days: 1
 
       - name: Upload failed raw source for parser repair
         if: failure()
