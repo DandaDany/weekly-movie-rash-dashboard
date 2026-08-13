@@ -94,7 +94,8 @@ Current P1 acceptance covers:
 - five regression tests;
 - MY + SG live: 20 valid records, including Previous Week and Release Date semantics;
 - ID live: 10 valid weekly records;
-- dashboard: six market tabs, live ID ranking metrics, blocked-source empty state, and MY ranking fields.
+- dashboard: six market tabs, live ID ranking metrics, blocked-source empty state, and MY ranking fields;
+- CI run #54: full end-to-end PASS on the current Draft head.
 
 ## Deployment
 
