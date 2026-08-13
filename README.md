@@ -25,13 +25,13 @@ The project deliberately avoids a database, backend server, Docker, or JavaScrip
 | MY | Cinema Online | Live | Plain HTTP + BeautifulSoup |
 | SG | Cinema Online | Live | Plain HTTP + BeautifulSoup |
 | ID | Cinepoint | Live | Public Chrome interaction; click Weekly and parse rendered HTML |
-| TW | TFAI / data.gov.tw | Monitored unavailable | GitHub runners are blocked by TFAI. The reachable official government metadata currently points to cumulative `since2016` data, not a single-week chart. |
+| TW | TFAI | Parser ready / runner blocked | Official homepage weekly cards are parsed directly (rank, title, period, movement, weekly gross). Fixture validation passes, but GitHub-hosted HTTP and Chrome are still blocked by TFAI Cloudflare. The cumulative `since2016` open-data resource remains explicitly rejected as a weekly substitute. |
 | VN | Box Office Vietnam | Monitored unavailable | Public logged-out page currently triggers Cloudflare/403 on GitHub-hosted automation. No Premium endpoint or bypass is used. |
-| HK | HKTDC FILMART | Monitored unavailable | Public weekly page currently returns 403 to GitHub-hosted automation. No bypass is used. |
+| HK | HKTDC FILMART | Monitored unavailable | Source is reachable from the runner, but no stable verifiable weekly table contract is exposed in the public HTTP response. |
 
 `Monitored unavailable` is intentional. The collector still runs every day, writes a machine-readable reason to `public/data/status.json`, and will surface an unexpected contract change for review. Known access limitations do not turn the daily workflow red.
 
-In particular, Taiwan's cumulative `since2016` dataset must never be sorted and presented as a weekly ranking.
+For Taiwan specifically, the parser is no longer the blocker. The official homepage markup supplied/validated for the weekly Top 10 maps cleanly into the shared schema, and regression tests preserve a separate semantic guard that refuses cumulative `since2016` JSON as weekly data. Current GitHub-hosted live execution still receives `access_blocked` from TFAI.
 
 ## Source isolation
 
@@ -41,7 +41,7 @@ Each source has its own collector:
 src/boxoffice/collectors/
   cinema_online.py   # MY + SG
   cinepoint.py       # ID
-  taiwan.py          # official metadata monitor; rejects cumulative-as-weekly
+  taiwan.py          # official homepage weekly Top 10 + cumulative-data guard
   vietnam.py         # public/free access monitor
   hong_kong.py       # public HKTDC access monitor
 ```
@@ -82,7 +82,7 @@ For MY/SG historical backfill:
 python scripts/backfill_cinema_online.py --start 2026-01-01 --end 2026-08-09
 ```
 
-The Cinepoint collector expects Google Chrome to be installed. GitHub-hosted Ubuntu runners already provide Chrome, so the workflow does not download a separate browser build.
+The Cinepoint collector and Taiwan browser fallback expect Google Chrome to be installed. GitHub-hosted Ubuntu runners already provide Chrome, so the workflow does not download a separate browser build.
 
 ## Automation
 
@@ -90,7 +90,15 @@ The Cinepoint collector expects Google Chrome to be installed. GitHub-hosted Ubu
 
 `run_all.py` always attempts every collector. Known source-unavailable conditions are recorded and do not stop the run. Unexpected defects are collected, the remaining sources still run, and the workflow exits red only after all sources have been attempted.
 
-PR CI runs regression tests, the same production `run_all.py`, a dashboard browser smoke test, validates the unavailable-source status contract, and uploads a `live-data-preview` artifact.
+PR CI runs regression tests, the same production `run_all.py`, a dashboard browser smoke test, validates source status contracts, and uploads a `live-data-preview` artifact.
+
+Current Taiwan acceptance (CI #67):
+
+- homepage fixture parser: PASS;
+- cumulative `since2016` semantic guard: PASS;
+- total regression tests: 8 passed;
+- GitHub-hosted live fetch: `unavailable / access_blocked` due to TFAI Cloudflare;
+- overall CI: PASS because this is a known source limitation, not a parser defect.
 
 ## Deployment
 
