@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  update-cinema-online:
+  update-boxoffice:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -28,13 +28,16 @@ jobs:
           cache: pip
 
       - name: Install
-        run: pip install -e ".[test]"
+        run: pip install -e ".[test,browser]"
 
       - name: Run parser/storage tests
         run: pytest -q
 
       - name: Run Malaysia + Singapore collector
         run: python scripts/run_cinema_online.py
+
+      - name: Run Indonesia collector
+        run: python scripts/run_cinepoint.py
 
       - name: Commit only when data changed
         run: |
