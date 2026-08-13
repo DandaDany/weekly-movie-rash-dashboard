@@ -32,52 +32,75 @@ jobs:
       - name: Live-check Indonesia
         run: python scripts/run_cinepoint.py
 
-      - name: Inspect Taiwan dataset metadata resources
+      - name: Diagnose Taiwan official weekly data routes
         run: |
           python - <<'PY'
-          import json
           import re
           import requests
+          from bs4 import BeautifulSoup
 
-          url = "https://data.gov.tw/api/v2/rest/dataset/94224"
-          r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=(10, 45))
-          r.raise_for_status()
-          result = r.json()["result"]
-          print("TOP_KEYS", sorted(result.keys()))
+          H = {"User-Agent": "Mozilla/5.0", "Accept": "application/json,text/html,text/csv,*/*"}
 
-          found = []
-          def walk(value, path="result"):
-              if isinstance(value, dict):
-                  for key, child in value.items():
-                      walk(child, f"{path}.{key}")
-              elif isinstance(value, list):
-                  for i, child in enumerate(value):
-                      walk(child, f"{path}[{i}]")
-              elif isinstance(value, str):
-                  low = value.lower()
-                  if (
-                      "http" in low
-                      or ".csv" in low
-                      or ".json" in low
-                      or "parameter" in path.lower()
-                      or "resource" in path.lower()
-                      or "oas" in path.lower()
-                  ):
-                      found.append((path, value))
+          # Known historical official weekly CSV, retained only as a route/access test.
+          static_url = "https://opendata.culture.tw/upload/dataSource/2018-11-01/56b0d2a6-d688-4348-a033-e84fdba66f8f/c30e5ed7e0c14c0c269e1387e634b8ae.csv"
+          r = requests.get(static_url, headers=H, timeout=(10, 45))
+          print("STATIC", r.status_code, r.headers.get("content-type"), len(r.content), r.url)
+          print("STATIC_HEAD", r.content[:1200])
 
-          walk(result)
-          for path, value in found:
-              print("VALUE", path, value[:4000])
-          print("FOUND_COUNT", len(found))
-
-          # Also inspect likely machine-readable metadata variants exposed by data.gov.tw.
-          for suffix in ["?format=json", "/dcat", "/rdf", "/history"]:
-              probe = "https://data.gov.tw/api/v2/rest/dataset/94224" + suffix
+          # Legacy OAS route: test only documented date-query semantics; no auth or bypass logic.
+          oas = "https://opendata.culture.tw/openData/openApi/movie20200601"
+          variants = [
+              {},
+              {"Start": "2026-07-27", "End": "2026-08-02"},
+              {"start": "2026-07-27", "end": "2026-08-02"},
+              {"startDate": "2026-07-27", "endDate": "2026-08-02"},
+              {"StartDate": "2026-07-27", "EndDate": "2026-08-02"},
+          ]
+          for params in variants:
               try:
-                  rr = requests.get(probe, headers={"User-Agent": "Mozilla/5.0"}, timeout=(10, 30))
-                  print("PROBE", probe, rr.status_code, rr.headers.get("content-type"), rr.text[:5000])
+                  rr = requests.get(oas, params=params, headers=H, timeout=(10, 45))
+                  print("OAS", rr.status_code, rr.headers.get("content-type"), rr.url, len(rr.content))
+                  print("OAS_BODY", rr.text[:6000])
               except Exception as exc:
-                  print("PROBE_ERROR", probe, type(exc).__name__, str(exc))
+                  print("OAS_ERROR", params, type(exc).__name__, str(exc))
+
+          # Inspect the official Culture open-data page and its own JS for resource/download routing.
+          detail = "https://opendata.culture.tw/frontsite/openData/detail?datasetId=668"
+          page = requests.get(detail, headers=H, timeout=(10, 45))
+          print("DETAIL", page.status_code, page.url, len(page.content))
+          page.raise_for_status()
+          soup = BeautifulSoup(page.text, "html.parser")
+          for tag in soup.find_all(["a", "button", "form"]):
+              txt = " ".join(tag.stripped_strings)
+              attrs = {k:v for k,v in tag.attrs.items() if k in {"href","action","onclick","id","class","data-url","data-id"}}
+              s = (txt + " " + str(attrs)).lower()
+              if any(k in s for k in ["download", "下載", "resource", "dataset", "openapi"]):
+                  print("DETAIL_TAG", txt[:300], attrs)
+
+          scripts = []
+          for tag in soup.find_all("script", src=True):
+              src = tag["src"]
+              if src.startswith("//"):
+                  src = "https:" + src
+              elif src.startswith("/"):
+                  src = "https://opendata.culture.tw" + src
+              elif not src.startswith("http"):
+                  src = "https://opendata.culture.tw/frontsite/openData/" + src
+              scripts.append(src)
+          print("SCRIPTS", scripts)
+          for src in scripts:
+              try:
+                  js = requests.get(src, headers=H, timeout=(10, 30))
+                  if js.status_code != 200:
+                      continue
+                  text = js.text
+                  hits = [m.start() for m in re.finditer(r"download|resource|openapi|datasource|datasetid", text, re.I)]
+                  if hits:
+                      print("JS", src, "HITS", len(hits))
+                      for pos in hits[:20]:
+                          print(text[max(0,pos-700):pos+1800])
+              except Exception as exc:
+                  print("JS_ERROR", src, type(exc).__name__, str(exc))
           PY
 
       - name: Upload failed raw source for parser repair
