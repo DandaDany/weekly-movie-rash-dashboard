@@ -40,6 +40,8 @@ jobs:
             public/data/**
             data/history/boxoffice.csv
             data/meta/crawl_status/**
+            data/raw/cinema_online/**
+            data/raw/cinepoint/**
           retention-days: 3
 
       - name: Upload failed raw source for parser repair
