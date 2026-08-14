@@ -117,14 +117,21 @@ class CinepointCollector(Collector):
                     state="visible", timeout=60_000
                 )
 
-                # The Weekly tab can become selected before the async rows arrive.
-                # Wait until a minimally valid chart is actually rendered, then
-                # let parser/validation enforce the final row/rank contract.
+                # The Weekly tab, period label, headers and rows hydrate on
+                # separate async passes. Require all three semantic signals
+                # before taking the HTML snapshot so a transient half-rendered
+                # panel cannot reach the parser.
                 page.wait_for_function(
                     """
                     () => {
                       const panel = document.querySelector('[role="tabpanel"][aria-hidden="false"]');
-                      return panel && panel.querySelectorAll('tbody.p-datatable-tbody tr').length >= 5;
+                      if (!panel) return false;
+                      const text = panel.textContent || '';
+                      const hasPeriod = /Period:\s*[A-Za-z]{3,9}\s+\d{1,2},\s+\d{4}\s*-\s*[A-Za-z]{3,9}\s+\d{1,2},\s+\d{4}/i.test(text);
+                      const hasRows = panel.querySelectorAll('tbody.p-datatable-tbody tr').length >= 5;
+                      const headers = [...panel.querySelectorAll('th')].map(el => (el.textContent || '').trim());
+                      const hasWeeklyHeader = headers.some(text => text.includes('Weekly Adm.'));
+                      return hasPeriod && hasRows && hasWeeklyHeader;
                     }
                     """,
                     timeout=60_000,
