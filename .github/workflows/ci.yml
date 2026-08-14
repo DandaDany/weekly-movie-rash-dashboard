@@ -61,6 +61,19 @@ jobs:
                   page.locator("#emptyState").wait_for(state="visible", timeout=5000)
                   assert "自動更新尚未接通" in page.locator("#emptyState").inner_text()
 
+              page.locator('[data-market="VN"]').click()
+              vn_rows = page.locator("tbody tr").count()
+              if vn_rows:
+                  assert vn_rows >= 5
+                  assert "越南票房排行" in page.locator("#marketTitle").inner_text()
+                  vn_headers = page.locator("thead").inner_text()
+                  assert "本期票房" in vn_headers
+                  assert "本期人次" in vn_headers
+                  assert "場次" in vn_headers
+              else:
+                  page.locator("#emptyState").wait_for(state="visible", timeout=5000)
+                  assert "自動更新尚未接通" in page.locator("#emptyState").inner_text()
+
               page.locator('[data-market="MY"]').click()
               page.locator("tbody tr").first.wait_for(timeout=5000)
               assert page.locator("tbody tr").count() == 10
@@ -78,19 +91,19 @@ jobs:
 
           status = json.loads(Path("public/data/status.json").read_text(encoding="utf-8"))
 
-          taiwan = status["taiwan"]
-          assert taiwan["availability"] in {"live", "unavailable"}, taiwan
-          if taiwan["availability"] == "live":
-              assert taiwan["success"] is True
-              assert taiwan["records"] >= 5
-          else:
-              assert taiwan["success"] is False
-              assert taiwan["reason"] == "access_blocked", taiwan
+          for collector in ("taiwan", "vietnam"):
+              item = status[collector]
+              assert item["availability"] in {"live", "unavailable"}, item
+              if item["availability"] == "live":
+                  assert item["success"] is True
+                  assert item["records"] >= 5
+              else:
+                  assert item["success"] is False
+                  assert item["reason"] == "access_blocked", item
 
-          for collector in ("vietnam", "hong_kong"):
-              assert collector in status, collector
-              assert status[collector]["availability"] == "unavailable", status[collector]
-              assert status[collector]["success"] is False
+          hong_kong = status["hong_kong"]
+          assert hong_kong["availability"] == "unavailable", hong_kong
+          assert hong_kong["success"] is False
 
           assert status["cinema_online"]["availability"] == "live"
           assert status["cinepoint"]["availability"] == "live"
