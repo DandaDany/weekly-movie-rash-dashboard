@@ -89,20 +89,21 @@ class CinepointCollector(Collector):
             try:
                 page.goto(BASE_URL, wait_until="domcontentloaded", timeout=90_000)
 
-                # PrimeNG renders Daily / Weekly / Monthly / Yearly as semantic
-                # role=tab controls. Target that contract instead of a generic
-                # text match so unrelated "Weekly" text cannot be clicked.
                 weekly_tab = page.get_by_role("tab", name="Weekly", exact=True)
                 weekly_tab.wait_for(state="visible", timeout=60_000)
 
-                # Cinepoint is SSR first, then Angular hydrates. Give the public
-                # tab its event handler before clicking.
-                page.wait_for_timeout(5_000)
-                if weekly_tab.get_attribute("aria-selected") != "true":
-                    weekly_tab.click(timeout=30_000)
+                # Do not click while the page is only SSR markup. Wait until the
+                # default Daily panel has hydrated enough to expose its semantic
+                # table header, which proves Angular/PrimeNG handlers are active.
+                daily_panel = page.locator('[role="tabpanel"][aria-hidden="false"]').first
+                daily_panel.locator("th", has_text="Daily Adm.").wait_for(
+                    state="visible", timeout=60_000
+                )
+
+                weekly_tab.click(timeout=30_000, force=True)
 
                 page.wait_for_function(
-                    """
+                    r"""
                     () => {
                       const tabs = [...document.querySelectorAll('[role="tab"]')];
                       const weekly = tabs.find(el => el.textContent.trim() === 'Weekly');
@@ -117,12 +118,10 @@ class CinepointCollector(Collector):
                     state="visible", timeout=60_000
                 )
 
-                # The Weekly tab, period label, headers and rows hydrate on
-                # separate async passes. Require all three semantic signals
-                # before taking the HTML snapshot so a transient half-rendered
-                # panel cannot reach the parser.
+                # Weekly tab selection, period label and rows hydrate separately.
+                # Require all semantic signals before taking the HTML snapshot.
                 page.wait_for_function(
-                    """
+                    r"""
                     () => {
                       const panel = document.querySelector('[role="tabpanel"][aria-hidden="false"]');
                       if (!panel) return false;
@@ -138,10 +137,13 @@ class CinepointCollector(Collector):
                 )
                 return FetchResult(source_url=page.url, body=page.content())
             except PlaywrightTimeoutError as exc:
-                body = page.content()
-                if body.strip():
-                    return FetchResult(source_url=page.url, body=body)
-                raise RuntimeError("Cinepoint Weekly view did not become available") from exc
+                # Never pass a half-rendered Daily/Weekly page to the parser. A
+                # source-interaction timeout is a real live-check failure and
+                # should be diagnosed at fetch time, not misreported as a parser
+                # field error.
+                raise RuntimeError(
+                    "Cinepoint Weekly view did not fully hydrate after selecting the Weekly tab"
+                ) from exc
             finally:
                 browser.close()
 
