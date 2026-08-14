@@ -1,0 +1,17 @@
+[project]
+name = "boxoffice-dashboard"
+version = "0.1.0"
+description = "Low-maintenance weekly box office data pipeline"
+requires-python = ">=3.11"
+dependencies = [
+  "beautifulsoup4>=4.12,<5",
+  "requests>=2.32,<3",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8,<9"]
+browser = ["playwright>=1.45,<2"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
