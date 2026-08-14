@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 from boxoffice.collectors.base import Collector, FetchResult
 from boxoffice.models import BoxOfficeRecord
 
-BASE_URL = "https://cinepoint.com/"
+BASE_URL = "https://cinepoint.com/home#/home"
 SOURCE_NAME = "Cinepoint"
 
 _PERIOD_RE = re.compile(
@@ -88,23 +88,45 @@ class CinepointCollector(Collector):
             page = browser.new_page(viewport={"width": 1440, "height": 1400})
             try:
                 page.goto(BASE_URL, wait_until="domcontentloaded", timeout=90_000)
-                weekly_tab = page.get_by_text("Weekly", exact=True).first
+
+                # PrimeNG renders Daily / Weekly / Monthly / Yearly as semantic
+                # role=tab controls. Target that contract instead of a generic
+                # text match so unrelated "Weekly" text cannot be clicked.
+                weekly_tab = page.get_by_role("tab", name="Weekly", exact=True)
                 weekly_tab.wait_for(state="visible", timeout=60_000)
 
                 # Cinepoint is SSR first, then Angular hydrates. Give the public
                 # tab its event handler before clicking.
                 page.wait_for_timeout(5_000)
-                weekly_tab.click(timeout=30_000)
-                page.locator("th", has_text="Weekly Adm.").wait_for(
+                if weekly_tab.get_attribute("aria-selected") != "true":
+                    weekly_tab.click(timeout=30_000)
+
+                page.wait_for_function(
+                    """
+                    () => {
+                      const tabs = [...document.querySelectorAll('[role="tab"]')];
+                      const weekly = tabs.find(el => el.textContent.trim() === 'Weekly');
+                      return weekly && weekly.getAttribute('aria-selected') === 'true';
+                    }
+                    """,
+                    timeout=30_000,
+                )
+
+                active_panel = page.locator('[role="tabpanel"][aria-hidden="false"]').first
+                active_panel.locator("th", has_text="Weekly Adm.").wait_for(
                     state="visible", timeout=60_000
                 )
 
-                # The header switches before the async weekly rows arrive. Do not
-                # snapshot the intermediate empty tbody: wait until a minimally
-                # valid chart is actually rendered, then let parser/validation
-                # enforce the final row/rank contract.
+                # The Weekly tab can become selected before the async rows arrive.
+                # Wait until a minimally valid chart is actually rendered, then
+                # let parser/validation enforce the final row/rank contract.
                 page.wait_for_function(
-                    "document.querySelectorAll('tbody.p-datatable-tbody tr').length >= 5",
+                    """
+                    () => {
+                      const panel = document.querySelector('[role="tabpanel"][aria-hidden="false"]');
+                      return panel && panel.querySelectorAll('tbody.p-datatable-tbody tr').length >= 5;
+                    }
+                    """,
                     timeout=60_000,
                 )
                 return FetchResult(source_url=page.url, body=page.content())
