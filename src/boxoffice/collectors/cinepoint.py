@@ -92,33 +92,46 @@ class CinepointCollector(Collector):
                 weekly_tab = page.get_by_role("tab", name="Weekly", exact=True)
                 weekly_tab.wait_for(state="visible", timeout=60_000)
 
-                # Do not click while the page is only SSR markup. Wait until the
-                # default Daily panel has hydrated enough to expose its semantic
-                # table header, which proves Angular/PrimeNG handlers are active.
-                daily_panel = page.locator('[role="tabpanel"][aria-hidden="false"]').first
-                daily_panel.locator("th", has_text="Daily Adm.").wait_for(
+                # Wait for the default table to appear, then give Angular a short
+                # extra hydration window before activating the semantic Weekly
+                # control. The source has recently shown transient Daily-only
+                # states on hosted runners.
+                page.locator('th', has_text="Daily Adm.").first.wait_for(
                     state="visible", timeout=60_000
                 )
+                page.wait_for_timeout(5_000)
 
-                weekly_tab.click(timeout=30_000, force=True)
+                def weekly_selected() -> bool:
+                    return weekly_tab.get_attribute("aria-selected") == "true"
 
-                page.wait_for_function(
-                    r"""
-                    () => {
-                      const tabs = [...document.querySelectorAll('[role="tab"]')];
-                      const weekly = tabs.find(el => el.textContent.trim() === 'Weekly');
-                      return weekly && weekly.getAttribute('aria-selected') === 'true';
-                    }
-                    """,
-                    timeout=30_000,
+                # Use only normal public UI activation methods. Retry because the
+                # first event can land before PrimeNG finishes binding handlers.
+                activation_methods = (
+                    lambda: weekly_tab.click(timeout=20_000),
+                    lambda: weekly_tab.evaluate("el => el.click()"),
+                    lambda: (weekly_tab.focus(), weekly_tab.press("Enter")),
                 )
+                last_error: Exception | None = None
+                for activate in activation_methods:
+                    if weekly_selected():
+                        break
+                    try:
+                        activate()
+                    except Exception as exc:  # try the next ordinary UI method
+                        last_error = exc
+                    page.wait_for_timeout(3_000)
+
+                if not weekly_selected():
+                    raise RuntimeError(
+                        "Cinepoint Weekly tab did not become selected after normal UI retries"
+                    ) from last_error
 
                 active_panel = page.locator('[role="tabpanel"][aria-hidden="false"]').first
                 active_panel.locator("th", has_text="Weekly Adm.").wait_for(
                     state="visible", timeout=60_000
                 )
 
-                # Weekly tab selection, period label and rows hydrate separately.
+                # Weekly selection, period label and rows hydrate separately.
                 # Require all semantic signals before taking the HTML snapshot.
                 page.wait_for_function(
                     r"""
@@ -137,10 +150,6 @@ class CinepointCollector(Collector):
                 )
                 return FetchResult(source_url=page.url, body=page.content())
             except PlaywrightTimeoutError as exc:
-                # Never pass a half-rendered Daily/Weekly page to the parser. A
-                # source-interaction timeout is a real live-check failure and
-                # should be diagnosed at fetch time, not misreported as a parser
-                # field error.
                 raise RuntimeError(
                     "Cinepoint Weekly view did not fully hydrate after selecting the Weekly tab"
                 ) from exc
