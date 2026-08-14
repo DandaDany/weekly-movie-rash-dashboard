@@ -162,7 +162,7 @@ class TaiwanCollector(Collector):
                 body_text = page.locator("body").inner_text()
                 if _looks_blocked(body_text):
                     raise SourceUnavailableError(
-                        "TFAI blocks GitHub-hosted Chrome before the official weekly homepage can load.",
+                        "TFAI blocks this browser execution environment before the official weekly homepage can load.",
                         reason="access_blocked",
                         source_url=page.url,
                     )
@@ -183,7 +183,7 @@ class TaiwanCollector(Collector):
                 html = page.content()
                 if _looks_blocked(html):
                     raise SourceUnavailableError(
-                        "TFAI blocks GitHub-hosted Chrome before the official weekly homepage can load.",
+                        "TFAI blocks this browser execution environment before the official weekly homepage can load.",
                         reason="access_blocked",
                         source_url=page.url,
                     ) from exc

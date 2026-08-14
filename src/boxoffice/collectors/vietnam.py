@@ -145,7 +145,7 @@ class VietnamCollector(Collector):
 
                 if _looks_blocked(page.content()):
                     raise SourceUnavailableError(
-                        "Box Office Vietnam blocks GitHub-hosted Chrome with Cloudflare verification.",
+                        "Box Office Vietnam blocks this browser execution environment with Cloudflare verification.",
                         reason="access_blocked",
                         source_url=PUBLIC_URL,
                     )
@@ -173,7 +173,7 @@ class VietnamCollector(Collector):
                 body = page.content()
                 if _looks_blocked(body):
                     raise SourceUnavailableError(
-                        "Box Office Vietnam blocks GitHub-hosted Chrome with Cloudflare verification.",
+                        "Box Office Vietnam blocks this browser execution environment with Cloudflare verification.",
                         reason="access_blocked",
                         source_url=PUBLIC_URL,
                     ) from exc
