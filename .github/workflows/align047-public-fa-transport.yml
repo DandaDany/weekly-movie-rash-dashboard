@@ -1,0 +1,75 @@
+name: ALIGN-047 public FA transport
+
+on:
+  push:
+    branches:
+      - align047-public-model-transport
+    paths:
+      - .github/workflows/align047-public-fa-transport.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      MODEL_ID: Qwen/Qwen3-ForcedAligner-0.6B
+      MODEL_REVISION: c7cbfc2048c462b0d63a45797104fc9db3ad62b7
+      EXPECTED_WEIGHTS_SHA256: 47831d0e82f96b20e9034dba01a075ee06436654719f6a68289e49f1b65ce0e7
+      RELEASE_TAG: align047-public-fa-transport-v1
+      HF_HUB_DISABLE_TELEMETRY: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install transport dependency
+        run: python -m pip install --disable-pip-version-check huggingface-hub==0.36.2
+      - name: Download exact public model and verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p transport/model transport/model_parts transport/wheels
+          python - <<'PY'
+          import os
+          from huggingface_hub import snapshot_download
+          snapshot_download(
+              repo_id=os.environ['MODEL_ID'],
+              revision=os.environ['MODEL_REVISION'],
+              allow_patterns=[
+                  'chat_template.json','config.json','generation_config.json','merges.txt',
+                  'model.safetensors','preprocessor_config.json','tokenizer_config.json','vocab.json'
+              ],
+              local_dir='transport/model',
+          )
+          PY
+          rm -rf transport/model/.cache
+          observed=$(sha256sum transport/model/model.safetensors | awk '{print $1}')
+          test "$observed" = "$EXPECTED_WEIGHTS_SHA256"
+          sha256sum transport/model/* | LC_ALL=C sort > transport/model_inventory.sha256
+          tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner -cf transport/qwen_fa_snapshot.tar -C transport model model_inventory.sha256
+          sha256sum transport/qwen_fa_snapshot.tar > transport/qwen_fa_snapshot.tar.sha256
+          split -b 96M -d -a 2 transport/qwen_fa_snapshot.tar transport/model_parts/qwen_fa_snapshot.part-
+          sha256sum transport/model_parts/qwen_fa_snapshot.part-* | LC_ALL=C sort > transport/model_parts/parts.sha256
+          cp transport/qwen_fa_snapshot.tar.sha256 transport/model_inventory.sha256 transport/model_parts/
+      - name: Download minimal Python wheels
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip download --disable-pip-version-check --no-deps --only-binary=:all: -d transport/wheels \
+            qwen-asr==0.0.6 transformers==4.57.6 accelerate==1.12.0 nagisa==0.2.11 tokenizers==0.22.2 huggingface-hub==0.36.2
+          sha256sum transport/wheels/* | LC_ALL=C sort > transport/wheels/wheels.sha256
+      - name: Publish public-model-only release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release delete "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag -y || true
+          gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+            --title 'Temporary ALIGN-047 public Qwen FA transport' \
+            --notes 'Public Apache-2.0 model/runtime transport only. Contains no Reserve audio, subtitles, candidates, checkpoints, or Gold.'
+          gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" transport/model_parts/* transport/wheels/*
