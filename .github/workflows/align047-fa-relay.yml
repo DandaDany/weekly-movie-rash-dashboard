@@ -18,24 +18,17 @@ jobs:
           set -euo pipefail
           ids=$(gh api --paginate "/repos/$GITHUB_REPOSITORY/actions/artifacts" --jq '.artifacts[].id' || true)
           for id in $ids; do gh api -X DELETE "/repos/$GITHUB_REPOSITORY/actions/artifacts/$id"; done
-      - name: Download public release group
+      - name: Download public release part
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
           mkdir relay
-          gh release download align047-public-fa-transport-v1 --repo "$GITHUB_REPOSITORY" \
-            -p 'qwen_fa_snapshot.part-16' -p 'qwen_fa_snapshot.part-17' -p 'qwen_fa_snapshot.part-18' \
-            -p 'qwen_fa_snapshot.tar.sha256' -p 'parts.sha256' -p 'model_inventory.sha256' \
-            -p 'qwen_asr-0.0.6-py3-none-any.whl' -p 'transformers-4.57.6-py3-none-any.whl' \
-            -p 'accelerate-1.12.0-py3-none-any.whl' -p 'nagisa-0.2.11-cp313-cp313-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl' \
-            -p 'tokenizers-0.22.2-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl' \
-            -p 'huggingface_hub-0.36.2-py3-none-any.whl' -p 'wheels.sha256' -D relay
-          ls -lh relay
+          gh release download align047-public-fa-transport-v1 --repo "$GITHUB_REPOSITORY" -p 'qwen_fa_snapshot.part-00' -D relay
       - uses: actions/upload-artifact@v4
         with:
-          name: align047-fa-relay-g4
+          name: align047-fa-part-00
           path: relay/*
           compression-level: 0
           retention-days: 1
