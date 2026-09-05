@@ -18,17 +18,19 @@ jobs:
           set -euo pipefail
           ids=$(gh api --paginate "/repos/$GITHUB_REPOSITORY/actions/artifacts" --jq '.artifacts[].id' || true)
           for id in $ids; do gh api -X DELETE "/repos/$GITHUB_REPOSITORY/actions/artifacts/$id"; done
-      - name: Download public release part
+      - name: Download public release parts
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
           mkdir relay
-          gh release download align047-public-fa-transport-v1 --repo "$GITHUB_REPOSITORY" -p 'qwen_fa_snapshot.part-01' -D relay
+          for n in 02 03 04 05; do gh release download align047-public-fa-transport-v1 --repo "$GITHUB_REPOSITORY" -p "qwen_fa_snapshot.part-$n" -D relay; done
       - uses: actions/upload-artifact@v4
-        with:
-          name: align047-fa-part-01
-          path: relay/*
-          compression-level: 0
-          retention-days: 1
+        with: {name: align047-fa-part-02, path: relay/qwen_fa_snapshot.part-02, compression-level: 0, retention-days: 1}
+      - uses: actions/upload-artifact@v4
+        with: {name: align047-fa-part-03, path: relay/qwen_fa_snapshot.part-03, compression-level: 0, retention-days: 1}
+      - uses: actions/upload-artifact@v4
+        with: {name: align047-fa-part-04, path: relay/qwen_fa_snapshot.part-04, compression-level: 0, retention-days: 1}
+      - uses: actions/upload-artifact@v4
+        with: {name: align047-fa-part-05, path: relay/qwen_fa_snapshot.part-05, compression-level: 0, retention-days: 1}
