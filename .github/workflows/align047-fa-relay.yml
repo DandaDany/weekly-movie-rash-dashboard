@@ -1,0 +1,35 @@
+name: ALIGN-047 FA artifact relay
+on:
+  push:
+    branches: [align047-public-model-transport]
+    paths: [.github/workflows/align047-fa-relay.yml]
+permissions:
+  actions: write
+  contents: read
+jobs:
+  relay:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Clear previous temporary artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ids=$(gh api --paginate "/repos/$GITHUB_REPOSITORY/actions/artifacts" --jq '.artifacts[].id' || true)
+          for id in $ids; do gh api -X DELETE "/repos/$GITHUB_REPOSITORY/actions/artifacts/$id"; done
+      - name: Download public release group
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir relay
+          gh release download align047-public-fa-transport-v1 --repo "$GITHUB_REPOSITORY" -p 'qwen_fa_snapshot.part-00' -p 'qwen_fa_snapshot.part-01' -p 'qwen_fa_snapshot.part-02' -p 'qwen_fa_snapshot.part-03' -D relay
+          ls -lh relay
+      - uses: actions/upload-artifact@v4
+        with:
+          name: align047-fa-relay-g0
+          path: relay/*
+          compression-level: 0
+          retention-days: 1
