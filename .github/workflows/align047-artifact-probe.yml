@@ -1,0 +1,17 @@
+name: ALIGN-047 artifact quota probe
+on:
+  push:
+    branches: [align047-public-model-transport]
+    paths: [.github/workflows/align047-artifact-probe.yml]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo ALIGN047 > probe.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: align047-probe
+          path: probe.txt
+          retention-days: 1
